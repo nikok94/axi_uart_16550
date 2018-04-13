@@ -649,8 +649,5 @@ begin
 				
 	  end case;
 	end process UART_PROCESS;
-
-
-  
 end Behavioral;
 -------------------------------------------------------------------------------
