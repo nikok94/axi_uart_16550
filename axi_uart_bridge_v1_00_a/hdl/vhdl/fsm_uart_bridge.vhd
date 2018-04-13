@@ -1,10 +1,10 @@
 -------------------------------------------------------------------------------
 -- Company: 
 -- Engineer: 
--- Create Date:     22.03.2018
+-- Create Date:     12.04.2018
 -- Design Name: 
--- Module Name:     infrastructure_module
--- Project Name: 
+-- Module Name:     fsm_uart_bridge
+-- Project Name:    axi_uart_master
 -- Target Devices: 
 -- Tool Versions: 
 -- Description: 
@@ -69,6 +69,7 @@ architecture Behavioral of fsm_uart_bridge is
 	signal		start_byte_i	: std_logic;
 	signal		rx_fifo_rd_en_i	: std_logic := '0';
 	signal		rd_rx_fifo_proc	: std_logic;
+	--			TRX_TYPE			--
 	signal		trx_req_ws		: std_logic:= '0'; 
 	signal		trx_req_wb_f	: std_logic:= '0'; 
 	signal		trx_req_wb_i	: std_logic:= '0';
@@ -109,7 +110,6 @@ architecture Behavioral of fsm_uart_bridge is
 	--------------------------------
 	signal		rx_fifo_rd_data_i : std_logic_vector ( 7 downto 0);
 	
---	signal		read_uart_data		: std_logic;
 	signal		bus2ip_mst_cmdack_i : std_logic;
 	signal		bus2ip_mst_cmplt_i	: std_logic;
 	signal		bus2ip_mstrd_d_i	: std_logic_vector(31 downto 0);
@@ -137,32 +137,6 @@ begin
 	rx_fifo_rd_en_i		<= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
 	rx_fifo_rd_en		<= rx_fifo_rd_en_i;
 
-
---	READ_EN_GEN_PROC : process (aclk, aresetn)
---	begin 
---		if aresetn = '0' then 
---			rx_fifo_rd_en_i <= '0';
---			elsif (aclk'event and aclk = '1') then
---			if (read_uart_data = '1') then
---			rx_fifo_rd_en_i <= '1';
---			else
---			rx_fifo_rd_en_i <= '0';
---			end if;
---		end if;
---	end process READ_EN_GEN_PROC;
-	
---	WRITE_EN_GEN_PROC : process (aclk, aresetn)
---	begin
---		if aresetn = '0' then 
---			tx_fifo_wr_en_i <= '0';
---			elsif (aclk'event and aclk = '1') then
---			if tx_fifo_full_n = '1' and wr_tx_fifo_proc = '1' then
---			tx_fifo_wr_en_i <= '1';
---			else
---			tx_fifo_wr_en_i <= '0';
---			end if;
---		end if;
---	end process WRITE_EN_GEN_PROC;
 
 	READ_START_BYTE_PROC : process (aclk, aresetn)
 	   begin
@@ -360,7 +334,9 @@ begin
 				end case;
 		end if;
 	end process;
-
+------------------------------------------------------------------------------------
+--	axi address read from uart 
+------------------------------------------------------------------------------------
 	ADDR_REG_PROCESS : process(aclk, aresetn)
 	begin
 		if aclk'event and aclk = '1' then
@@ -380,7 +356,10 @@ begin
 			end if;
 		end if;
 	end process ADDR_REG_PROCESS;
-	
+
+-----------------------------------------------------------------------------------
+--	axi data read from uart
+-----------------------------------------------------------------------------------	
 	DATA_REG_PROCESS : process(aclk, aresetn)
 	begin
 		if aclk'event and aclk = '1' then
@@ -400,7 +379,10 @@ begin
 			end if;
 		end if;
 	end process DATA_REG_PROCESS;
-	
+
+----------------------------------------------------------------------------------
+--	read data from axi
+----------------------------------------------------------------------------------
 	RES_RD_DATA_PROCESS : process (aclk, aresetn)
 	begin
 		if aclk'event and aclk = '1' then
@@ -413,6 +395,10 @@ begin
 			end if;
 		end if;
 	end process RES_RD_DATA_PROCESS;
+	
+---------------------------------------------------------------------------------
+--	state handler
+---------------------------------------------------------------------------------
 
 	UART_PROCESS : process (uart_state) is
 	begin
