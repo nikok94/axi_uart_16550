@@ -395,11 +395,10 @@ begin
 			end if;
 		end if;
 	end process RES_RD_DATA_PROCESS;
-	
+
 ---------------------------------------------------------------------------------
 --	state handler
 ---------------------------------------------------------------------------------
-
 	UART_PROCESS : process (uart_state) is
 	begin
 	  case uart_state is
@@ -650,7 +649,5 @@ begin
 	  end case;
 	end process UART_PROCESS;
 
-
-  
 end Behavioral;
 -------------------------------------------------------------------------------
