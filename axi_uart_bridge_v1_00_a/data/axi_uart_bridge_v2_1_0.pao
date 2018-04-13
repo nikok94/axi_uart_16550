@@ -1,0 +1,28 @@
+## Helper Libraries
+lib proc_common_v3_00_a all
+##
+###############################################################################
+## AXI Master Lite Core
+
+lib axi_uart_bridge_v1_00_a axi_master_lite.vhd
+lib axi_uart_bridge_v1_00_a axi_master_lite_cntlr.vhd
+lib axi_uart_bridge_v1_00_a axi_master_lite_reset.vhd
+
+lib axi_uart_bridge_v1_00_a axi_uart_bridge.vhd
+lib axi_uart_bridge_v1_00_a fsm_uart_bridge.vhd
+lib axi_uart_bridge_v1_00_a rx16550.vhd
+lib axi_uart_bridge_v1_00_a rx_fifo_block.vhd
+lib axi_uart_bridge_v1_00_a rx_fifo_control.vhd
+lib axi_uart_bridge_v1_00_a tx16550.vhd
+lib axi_uart_bridge_v1_00_a tx_fifo_block.vhd
+lib axi_uart_bridge_v1_00_a uart16550.vhd
+lib axi_uart_bridge_v1_00_a xuart.vhd
+
+
+
+
+
+
+
+
+
