@@ -17,7 +17,7 @@ lib axi_uart_bridge_v1_00_a tx16550.vhd
 lib axi_uart_bridge_v1_00_a tx_fifo_block.vhd
 lib axi_uart_bridge_v1_00_a uart16550.vhd
 lib axi_uart_bridge_v1_00_a xuart.vhd
-
+lib axi_uart_bridge_v1_00_a uart_interrupt_control.vhd
 
 
 
