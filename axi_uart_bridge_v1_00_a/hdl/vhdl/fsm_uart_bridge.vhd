@@ -1,10 +1,10 @@
 -------------------------------------------------------------------------------
 -- Company: 
 -- Engineer: 
--- Create Date:     12.04.2018
+-- Create Date:     22.03.2018
 -- Design Name: 
--- Module Name:     fsm_uart_bridge
--- Project Name:    axi_uart_master
+-- Module Name:     infrastructure_module
+-- Project Name: 
 -- Target Devices: 
 -- Tool Versions: 
 -- Description: 
@@ -69,7 +69,6 @@ architecture Behavioral of fsm_uart_bridge is
 	signal		start_byte_i	: std_logic;
 	signal		rx_fifo_rd_en_i	: std_logic := '0';
 	signal		rd_rx_fifo_proc	: std_logic;
-	--			TRX_TYPE			--
 	signal		trx_req_ws		: std_logic:= '0'; 
 	signal		trx_req_wb_f	: std_logic:= '0'; 
 	signal		trx_req_wb_i	: std_logic:= '0';
@@ -110,42 +109,40 @@ architecture Behavioral of fsm_uart_bridge is
 	--------------------------------
 	signal		rx_fifo_rd_data_i : std_logic_vector ( 7 downto 0);
 	
+--	signal		read_uart_data		: std_logic;
 	signal		bus2ip_mst_cmdack_i : std_logic;
 	signal		bus2ip_mst_cmplt_i	: std_logic;
 	signal		bus2ip_mstrd_d_i	: std_logic_vector(31 downto 0);
 
 ---------------------------- Architecture body --------------------------------
 begin
-	bus2ip_mstrd_d_i 	<= bus2ip_mstrd_d;
-	bus2ip_mst_cmplt_i	<= bus2ip_mst_cmplt;
-	bus2ip_mst_cmdack_i	<= bus2ip_mst_cmdack;
-	rx_fifo_rd_data_i	<= rx_fifo_rd_data;
-	
-	ip2bus_mstwr_req	<= master_write;
-	ip2bus_mstrd_req	<= master_read;
+    bus2ip_mstrd_d_i 	<= bus2ip_mstrd_d;
+    bus2ip_mst_cmplt_i	<= bus2ip_mst_cmplt;
+    bus2ip_mst_cmdack_i	<= bus2ip_mst_cmdack;
+    rx_fifo_rd_data_i	<= rx_fifo_rd_data;
+    ip2bus_mstwr_req	<= master_write;
+    ip2bus_mstrd_req	<= master_read;
 
-	
-	tx_fifo_wr_data		<= fsm2uart_wr_data; 
-	tx_fifo_full_n		<= not tx_fifo_full;
-	tx_fifo_wr_en_i		<= '1' when ((tx_fifo_full_n = '1') and (wr_tx_fifo_proc = '1')) else '0';
-	tx_fifo_wr_en		<= tx_fifo_wr_en_i;
-	ip2bus_mst_addr		<= axi_addr;
-	ip2bus_mstwr_d		<= axi_wr_data;
-	u_wr_addr			<= axi_addr;
-	u_wr_data			<= axi_rd_data;
+    tx_fifo_wr_data		<= fsm2uart_wr_data; 
+    tx_fifo_full_n		<= not tx_fifo_full;
+    tx_fifo_wr_en_i		<= '1' when ((tx_fifo_full_n = '1') and (wr_tx_fifo_proc = '1')) else '0';
+    tx_fifo_wr_en		<= tx_fifo_wr_en_i;
+    ip2bus_mst_addr		<= axi_addr;
+    ip2bus_mstwr_d		<= axi_wr_data;
+    u_wr_addr			<= axi_addr;
+    u_wr_data			<= axi_rd_data;
 
 	rx_fifo_rd_en_i		<= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
 	rx_fifo_rd_en		<= rx_fifo_rd_en_i;
-
 
 	READ_START_BYTE_PROC : process (aclk, aresetn)
 	   begin
 		if aclk'event and aclk = '1' then
 			if aresetn = '0' then
-			trx_req_ws		 <= '0';
+			trx_req_ws       <= '0';
 			trx_req_wb_f     <= '0';
 			trx_req_wb_i     <= '0';
-			trx_req_rs		 <= '0';
+			trx_req_rs       <= '0';
 			trx_req_rb_f     <= '0';
 			trx_req_rb_i     <= '0';
 			
@@ -334,9 +331,7 @@ begin
 				end case;
 		end if;
 	end process;
-------------------------------------------------------------------------------------
---	axi address read from uart 
-------------------------------------------------------------------------------------
+
 	ADDR_REG_PROCESS : process(aclk, aresetn)
 	begin
 		if aclk'event and aclk = '1' then
@@ -356,10 +351,7 @@ begin
 			end if;
 		end if;
 	end process ADDR_REG_PROCESS;
-
------------------------------------------------------------------------------------
---	axi data read from uart
------------------------------------------------------------------------------------	
+	
 	DATA_REG_PROCESS : process(aclk, aresetn)
 	begin
 		if aclk'event and aclk = '1' then
@@ -379,10 +371,7 @@ begin
 			end if;
 		end if;
 	end process DATA_REG_PROCESS;
-
-----------------------------------------------------------------------------------
---	read data from axi
-----------------------------------------------------------------------------------
+	
 	RES_RD_DATA_PROCESS : process (aclk, aresetn)
 	begin
 		if aclk'event and aclk = '1' then
@@ -395,10 +384,6 @@ begin
 			end if;
 		end if;
 	end process RES_RD_DATA_PROCESS;
-	
----------------------------------------------------------------------------------
---	state handler
----------------------------------------------------------------------------------
 
 	UART_PROCESS : process (uart_state) is
 	begin
@@ -649,5 +634,8 @@ begin
 				
 	  end case;
 	end process UART_PROCESS;
+
+
+  
 end Behavioral;
 -------------------------------------------------------------------------------
