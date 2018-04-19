@@ -99,21 +99,24 @@ architecture Behavioral of uart_interrupt_control is
     signal send_addr_byte_2     : std_logic_vector(7 downto 0);
     signal send_addr_byte_3     : std_logic_vector(7 downto 0);
     signal send_addr_byte_4     : std_logic_vector(7 downto 0);
+    signal INTR_vec_i           : std_logic_vector(7 downto 0);
+    signal null_vec             : std_logic_vector(7 downto 0):= B"00000000";
 ---------------------------- Architecture body --------------------------------
 begin
     tx_fifo_wr_data <= tx_fifo_wr_data_i;
     tx_fifo_wr_en   <= tx_fifo_wr_en_i;
     send_intr_proc  <= send_intr_proc_i;
     tx_fifo_wr_en_i <= '1' when ((send_intr_proc_i and not send_rw_axi_proc) = '1' and tx_fifo_full = '0') else '0';
+    INTR_vec_i <= null_vec(7 downto C_INTR_WIDTH)& INTR_vec(C_INTR_WIDTH-1 downto 0);
 
-    in_intr_0 <= INTR_vec(0); --when (INTR_WIDTH >= 1) else '0';
-    in_intr_1 <= INTR_vec(1); --when (INTR_WIDTH >= 2) else '0';
-    in_intr_2 <= INTR_vec(2); --when (INTR_WIDTH >= 3) else '0';
-    in_intr_3 <= INTR_vec(3); --when (INTR_WIDTH >= 4) else '0';
-    in_intr_4 <= INTR_vec(4); --when (INTR_WIDTH >= 5) else '0';
-    in_intr_5 <= INTR_vec(5); --when (INTR_WIDTH >= 6) else '0';
-    in_intr_6 <= INTR_vec(6); --when (INTR_WIDTH >= 7) else '0';
-    in_intr_7 <= INTR_vec(7); --when (INTR_WIDTH  = 8) else '0';
+    in_intr_0 <= INTR_vec_i(0); 
+    in_intr_1 <= INTR_vec_i(1); 
+    in_intr_2 <= INTR_vec_i(2); 
+    in_intr_3 <= INTR_vec_i(3); 
+    in_intr_4 <= INTR_vec_i(4); 
+    in_intr_5 <= INTR_vec_i(5); 
+    in_intr_6 <= INTR_vec_i(6); 
+    in_intr_7 <= INTR_vec_i(7); 
 
     DELAY_INTR_PROC_0 : process (aclk, aresetn)
     begin

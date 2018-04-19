@@ -16,7 +16,7 @@ entity axi_uart_bridge is
     generic (
         C_M_AXI_LITE_ADDR_WIDTH : INTEGER range 32 to 32        := 32;
         C_M_AXI_LITE_DATA_WIDTH : INTEGER range 32 to 32        := 32;
-    
+
         C_FAMILY                : string                        := "spartan6";
         C_RFTL                  : integer                       := 8;   
         C_S_AXI_CLK_FREQ_HZ     : integer                       := 100_000_000;
@@ -24,6 +24,7 @@ entity axi_uart_bridge is
         C_HAS_EXTERNAL_RCLK     : integer range 0 to 1          := 0;
         C_WLS                   : integer range 5 to 8          := 8;
         C_STB                   : integer range 1 to 2          := 1;
+        C_HAS_INTR              : integer range 0 to 1          := 0;
         C_INTR_WIDTH            : integer range 1 to 8          := 8;
         C_INTR_ADDR_0           : std_logic_vector(31 DOWNTO 0) := x"FFFF_FFFF";
         C_INTR_ADDR_1           : std_logic_vector(31 DOWNTO 0) := x"FFFF_FFFF";
@@ -71,7 +72,7 @@ end entity axi_uart_bridge;
 
 ----------------------- Architecture declaration ------------------------------
 architecture Behavioral of axi_uart_bridge is
-
+    signal HAS_INTR                : integer := C_HAS_INTR;
     signal tx_fifo_wr_en           : std_logic;
     signal tx_fifo_wr_en_int       : std_logic;
     signal tx_fifo_wr_en_fsm       : std_logic;
@@ -105,10 +106,41 @@ architecture Behavioral of axi_uart_bridge is
 
 
 begin
+    INCLUDE_VEC_INTRPT : if HAS_INTR = 1 generate
+
+INTR_inst : entity axi_uart_bridge_v1_00_a.uart_interrupt_control
+    generic map (
+        C_INTR_WIDTH            => C_INTR_WIDTH,
+        C_INTR_ADDR_0           => C_INTR_ADDR_0,
+        C_INTR_ADDR_1           => C_INTR_ADDR_1,
+        C_INTR_ADDR_2           => C_INTR_ADDR_2,
+        C_INTR_ADDR_3           => C_INTR_ADDR_3,
+        C_INTR_ADDR_4           => C_INTR_ADDR_4,
+        C_INTR_ADDR_5           => C_INTR_ADDR_5,
+        C_INTR_ADDR_6           => C_INTR_ADDR_6,
+        C_INTR_ADDR_7           => C_INTR_ADDR_7
+    )
+    port map (
+        aclk                    => aclk,
+        aresetn                 => aresetn,
+        tx_fifo_wr_en           => tx_fifo_wr_en_int,
+        tx_fifo_wr_data         => tx_fifo_wr_data_int,
+        tx_fifo_full            => tx_fifo_full,
+        send_rw_axi_proc        => send_rw_axi_proc,
+        send_intr_proc          => send_intr_proc,
+        INTR_vec                => INTR_vec
+    );
+
     tx_fifo_wr_en <= tx_fifo_wr_en_fsm when send_rw_axi_proc = '1' else tx_fifo_wr_en_int;
     tx_fifo_wr_data <= tx_fifo_wr_data_fsm when send_rw_axi_proc = '1' else tx_fifo_wr_data_int;
-  --  tx_fifo_wr_en <= tx_fifo_wr_en_fsm;
-  --  tx_fifo_wr_data <= tx_fifo_wr_data_fsm;
+    end generate INCLUDE_VEC_INTRPT;
+
+    NOT_VEC_INTRPT : if HAS_INTR /= 1 generate
+
+    tx_fifo_wr_en <= tx_fifo_wr_en_fsm;
+    tx_fifo_wr_data <= tx_fifo_wr_data_fsm;
+    
+    end generate NOT_VEC_INTRPT;
     
 xuart_inst : entity axi_uart_bridge_v1_00_a.xuart
     generic map (
@@ -172,29 +204,6 @@ FSM_inst : entity axi_uart_bridge_v1_00_a.fsm_uart_bridge
         bus2ip_mstwr_dst_rdy_n  => bus2ip_mstwr_dst_rdy_n,
         send_rw_axi_proc        => send_rw_axi_proc,
         send_intr_proc          => send_intr_proc
-    );
-
-INTR_inst : entity axi_uart_bridge_v1_00_a.uart_interrupt_control
-    generic map (
-        C_INTR_WIDTH            => C_INTR_WIDTH,
-        C_INTR_ADDR_0           => C_INTR_ADDR_0,
-        C_INTR_ADDR_1           => C_INTR_ADDR_1,
-        C_INTR_ADDR_2           => C_INTR_ADDR_2,
-        C_INTR_ADDR_3           => C_INTR_ADDR_3,
-        C_INTR_ADDR_4           => C_INTR_ADDR_4,
-        C_INTR_ADDR_5           => C_INTR_ADDR_5,
-        C_INTR_ADDR_6           => C_INTR_ADDR_6,
-        C_INTR_ADDR_7           => C_INTR_ADDR_7
-    )
-    port map (
-        aclk                    => aclk,
-        aresetn                 => aresetn,
-        tx_fifo_wr_en           => tx_fifo_wr_en_int,
-        tx_fifo_wr_data         => tx_fifo_wr_data_int,
-        tx_fifo_full            => tx_fifo_full,
-        send_rw_axi_proc        => send_rw_axi_proc,
-        send_intr_proc          => send_intr_proc,
-        INTR_vec                => INTR_vec
     );
 
 axi_master_inst : entity axi_uart_bridge_v1_00_a.axi_master_lite 
