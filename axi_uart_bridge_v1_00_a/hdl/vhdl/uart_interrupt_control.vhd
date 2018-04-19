@@ -53,6 +53,15 @@ architecture Behavioral of uart_interrupt_control is
     signal in_intr_6            : std_logic;
     signal in_intr_7            : std_logic;
     
+    signal INTR_ADDR_0          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_0 ;
+    signal INTR_ADDR_1          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_1 ;
+    signal INTR_ADDR_2          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_2 ;
+    signal INTR_ADDR_3          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_3 ;
+    signal INTR_ADDR_4          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_4 ;
+    signal INTR_ADDR_5          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_5 ;
+    signal INTR_ADDR_6          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_6 ;
+    signal INTR_ADDR_7          : std_logic_vector(31 DOWNTO 0):= C_INTR_ADDR_7 ;
+    
     signal d_in_intr_0          : std_logic;
     signal d_in_intr_1          : std_logic;
     signal d_in_intr_2          : std_logic;
@@ -80,34 +89,25 @@ architecture Behavioral of uart_interrupt_control is
     signal u_s_intr_6           : std_logic:='0';
     signal u_s_intr_7           : std_logic:='0';
 
-    signal s_int_addr_0         : std_logic;
-    signal s_int_addr_1         : std_logic;
-    signal s_int_addr_2         : std_logic;
-    signal s_int_addr_3         : std_logic;
-    signal s_int_addr_4         : std_logic;
-    signal s_int_addr_5         : std_logic;
-    signal s_int_addr_6         : std_logic;
-    signal s_int_addr_7         : std_logic;
-    
     signal INTR_TYPE            : std_logic_vector(7 downto 0):= B"00110000";
 
     signal tx_fifo_wr_en_i      : std_logic;
     signal send_intr_proc_i     : std_logic;
     signal tx_fifo_wr_data_i    : std_logic_vector(7 downto 0);
 
-    signal send_addr_byte_1     : std_logic_vector(7 downto 0);
-    signal send_addr_byte_2     : std_logic_vector(7 downto 0);
-    signal send_addr_byte_3     : std_logic_vector(7 downto 0);
-    signal send_addr_byte_4     : std_logic_vector(7 downto 0);
+    signal addr_byte_1     : std_logic_vector(7 downto 0);
+    signal addr_byte_2     : std_logic_vector(7 downto 0);
+    signal addr_byte_3     : std_logic_vector(7 downto 0);
+    signal addr_byte_4     : std_logic_vector(7 downto 0);
     signal INTR_vec_i           : std_logic_vector(7 downto 0);
-    signal null_vec             : std_logic_vector(7 downto 0):= B"00000000";
+    signal zeros_vec            : std_logic_vector(7 downto 0):= B"00000000";
 ---------------------------- Architecture body --------------------------------
 begin
     tx_fifo_wr_data <= tx_fifo_wr_data_i;
     tx_fifo_wr_en   <= tx_fifo_wr_en_i;
     send_intr_proc  <= send_intr_proc_i;
     tx_fifo_wr_en_i <= '1' when ((send_intr_proc_i and not send_rw_axi_proc) = '1' and tx_fifo_full = '0') else '0';
-    INTR_vec_i <= null_vec(7 downto C_INTR_WIDTH)& INTR_vec(C_INTR_WIDTH-1 downto 0);
+    INTR_vec_i <= zeros_vec(7 downto C_INTR_WIDTH)& INTR_vec(C_INTR_WIDTH-1 downto 0);
 
     in_intr_0 <= INTR_vec_i(0); 
     in_intr_1 <= INTR_vec_i(1); 
@@ -294,40 +294,7 @@ begin
         end if;
     end process INTR_7_PROC;
 
-
---    intr_0 <= '1' when (not d_in_intr_0 and in_intr_0) = '1' else '0'
---                  when s_int_addr_0 = '1' and tx_fifo_wr_en_i = '1';
---                  
---    intr_1 <= '1' when (not d_in_intr_1 and in_intr_1) = '1' else '0'
---                  when s_int_addr_1 = '1' and tx_fifo_wr_en_i = '1';
---                  
---    intr_2 <= '1' when (not d_in_intr_2 and in_intr_2) = '1' else '0'
---                  when s_int_addr_2 = '1' and tx_fifo_wr_en_i = '1';
---                  
---    intr_3 <= '1' when (not d_in_intr_3 and in_intr_3) = '1' else '0'
---                  when s_int_addr_3 = '1' and tx_fifo_wr_en_i = '1';
---                  
---    intr_4 <= '1' when (not d_in_intr_4 and in_intr_4) = '1' else '0'
---                  when s_int_addr_4 = '1' and tx_fifo_wr_en_i = '1';
---                  
---    intr_5 <= '1' when (not d_in_intr_5 and in_intr_5) = '1' else '0'
---                  when s_int_addr_5 = '1' and tx_fifo_wr_en_i = '1';
---                  
---    intr_6 <= '1' when (not d_in_intr_6 and in_intr_6) = '1' else '0'
---                  when s_int_addr_6 = '1' and tx_fifo_wr_en_i = '1';
---                  
---    intr_7 <= '1' when (not d_in_intr_7 and in_intr_7) = '1' else '0'
---                  when s_int_addr_7 = '1' and tx_fifo_wr_en_i = '1';
-
-    s_int_addr_0 <= '1' when (intr_0 ='1') else '0';
-    s_int_addr_1 <= '1' when (s_int_addr_0 = '0' and s_int_addr_0 = '0' and intr_1 = '1') else '0';
-    s_int_addr_2 <= '1' when (s_int_addr_0 = '0' and s_int_addr_1 = '0' and intr_2 = '1') else '0';
-    s_int_addr_3 <= '1' when (s_int_addr_0 = '0' and s_int_addr_2 = '0' and intr_3 = '1') else '0';
-    s_int_addr_4 <= '1' when (s_int_addr_0 = '0' and s_int_addr_3 = '0' and intr_4 = '1') else '0';
-    s_int_addr_5 <= '1' when (s_int_addr_0 = '0' and s_int_addr_4 = '0' and intr_5 = '1') else '0';
-    s_int_addr_6 <= '1' when (s_int_addr_0 = '0' and s_int_addr_5 = '0' and intr_6 = '1') else '0';
-    s_int_addr_7 <= '1' when (s_int_addr_0 = '0' and s_int_addr_6 = '0' and intr_7 = '1') else '0';
------------------------------------------------------------------------------
+   --------------------------------------------------------------------------
 --                          INTR_STATE_PROCESS                             --
 -----------------------------------------------------------------------------
     INTR_STATE_PROC : process (aclk,aresetn)
@@ -337,73 +304,105 @@ begin
            elsif (aclk'event and aclk = '1') then
               case intr_state is
                 when IDLE => 
-                  if s_int_addr_0 = '1' and send_rw_axi_proc = '0' then
+                  if intr_0 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_0;
-                  elsif s_int_addr_1 = '1' and send_rw_axi_proc = '0' then
+                  elsif intr_1 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_1;
-                  elsif s_int_addr_2 = '1' and send_rw_axi_proc = '0' then
+                  elsif intr_2 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_2;
-                  elsif s_int_addr_3 = '1' and send_rw_axi_proc = '0' then
+                  elsif intr_3 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_3;
-                  elsif s_int_addr_4 = '1' and send_rw_axi_proc = '0' then
+                  elsif intr_4 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_4;
-                  elsif s_int_addr_5 = '1' and send_rw_axi_proc = '0' then
+                  elsif intr_5 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_5;
-                  elsif s_int_addr_6 = '1' and send_rw_axi_proc = '0' then
+                  elsif intr_6 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_6;
-                  elsif s_int_addr_7 = '1' and send_rw_axi_proc = '0' then
+                  elsif intr_7 = '1' and send_rw_axi_proc = '0' then
                   intr_state <= ADDR_7;
                   else
                   intr_state <= IDLE;
                   end if;
                 when ADDR_0 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_0;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_0(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_0(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_0(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_0(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_0;
+                    end if;
                 when ADDR_1 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_1;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_1(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_1(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_1(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_1(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_1;
+                    end if;
                 when ADDR_2 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_2;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_2(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_2(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_2(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_2(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_2;
+                    end if;
                 when ADDR_3 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_3;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_3(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_3(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_3(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_3(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_3;
+                    end if;
                 when ADDR_4 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_4;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_4(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_4(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_4(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_4(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_4;
+                    end if;
                 when ADDR_5 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_5;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_5(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_5(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_5(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_5(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_5;
+                    end if;
                 when ADDR_6 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_6;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_6(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_6(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_6(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_6(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_6;
+                    end if;
                 when ADDR_7 =>
-                  if tx_fifo_wr_en_i = '1' then
-                  intr_state <= U_SEND_ADDR_BYTE1;
-                  else 
-                  intr_state <= ADDR_7;
-                  end if;
+                  addr_byte_1 <= INTR_ADDR_7(7 downto 0);
+                  addr_byte_2 <= INTR_ADDR_7(15 downto 8);
+                  addr_byte_3 <= INTR_ADDR_7(23 downto 16);
+                  addr_byte_4 <= INTR_ADDR_7(31 downto 24);
+                    if tx_fifo_wr_en_i = '1' then
+                    intr_state <= U_SEND_ADDR_BYTE1;
+                    else 
+                    intr_state <= ADDR_7;
+                    end if;
                 when U_SEND_ADDR_BYTE1 =>
                   if tx_fifo_wr_en_i = '1' then
                   intr_state <= U_SEND_ADDR_BYTE2;
@@ -451,66 +450,34 @@ begin
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_0 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_0(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_0(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_0(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_0(31 downto 24);
         when ADDR_1 =>
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_1 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_1(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_1(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_1(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_1(31 downto 24);
         when ADDR_2 =>
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_2 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_2(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_2(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_2(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_2(31 downto 24);
         when ADDR_3 =>
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_3 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_3(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_3(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_3(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_3(31 downto 24);
         when ADDR_4 =>
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_4 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_4(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_4(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_4(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_4(31 downto 24);
         when ADDR_5 =>
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_5 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_5(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_5(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_5(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_5(31 downto 24);
         when ADDR_6 =>
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_6 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_6(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_6(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_6(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_6(31 downto 24);
         when ADDR_7 =>
           tx_fifo_wr_data_i <= INTR_TYPE;
           u_s_intr_7 <= '1';
           send_intr_proc_i <= '1';
-          send_addr_byte_1 <= C_INTR_ADDR_7(7 downto 0);
-          send_addr_byte_2 <= C_INTR_ADDR_7(15 downto 8);
-          send_addr_byte_3 <= C_INTR_ADDR_7(23 downto 16);
-          send_addr_byte_4 <= C_INTR_ADDR_7(31 downto 24);
         when U_SEND_ADDR_BYTE1 =>
           u_s_intr_0 <= '0';
           u_s_intr_1 <= '0';
@@ -520,16 +487,16 @@ begin
           u_s_intr_5 <= '0';
           u_s_intr_6 <= '0';
           u_s_intr_7 <= '0';
-          tx_fifo_wr_data_i <= send_addr_byte_1;
+          tx_fifo_wr_data_i <= addr_byte_1;
           send_intr_proc_i <= '1';
         when U_SEND_ADDR_BYTE2 =>
-          tx_fifo_wr_data_i <= send_addr_byte_2;
+          tx_fifo_wr_data_i <= addr_byte_2;
           send_intr_proc_i <= '1';
         when U_SEND_ADDR_BYTE3 =>
-          tx_fifo_wr_data_i <= send_addr_byte_3;
+          tx_fifo_wr_data_i <= addr_byte_3;
           send_intr_proc_i <= '1';
         when U_SEND_ADDR_BYTE4 =>
-          tx_fifo_wr_data_i <= send_addr_byte_4;
+          tx_fifo_wr_data_i <= addr_byte_4;
           send_intr_proc_i <= '1';
       end case;
     end process SEND_INTR_PROCESS;
