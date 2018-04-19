@@ -20,6 +20,11 @@ library UNISIM;
 
 --------------------------- Entity declaration --------------------------------
 entity fsm_uart_bridge is
+generic (
+    generic map (
+    C_AXI_RW_TIME_OUT       : integer := 500;
+    C_S_AXI_CLK_FREQ_HZ     : integer := 100_000_000;
+    )
 port (
     aclk                    : in  std_logic;
     aresetn                 : in  std_logic;
@@ -87,18 +92,18 @@ architecture Behavioral of fsm_uart_bridge is
     signal addr_byte4      : std_logic_vector(7 downto 0);
     signal last_addr_byte  : std_logic;
 
-    signal axi_tr_len		: std_logic_vector(31 downto 0);
-    signal len_byte2		: std_logic_vector(7 downto 0);
-    signal len_byte3		: std_logic_vector(7 downto 0);
-    signal len_byte4		: std_logic_vector(7 downto 0);
-    signal last_len_byte	: std_logic;
-    signal len_rdy			: std_logic;
+    signal axi_tr_len       : std_logic_vector(31 downto 0);
+    signal len_byte2        : std_logic_vector(7 downto 0);
+    signal len_byte3        : std_logic_vector(7 downto 0);
+    signal len_byte4        : std_logic_vector(7 downto 0);
+    signal last_len_byte    : std_logic;
+    signal len_rdy          : std_logic;
 
-    signal wr_tx_fifo_proc	: std_logic;
-    signal axi_wr_data		: std_logic_vector(31 downto 0);
-    signal wr_data_byte2	: std_logic_vector(7 downto 0);
-    signal wr_data_byte3	: std_logic_vector(7 downto 0);
-    signal wr_data_byte4	: std_logic_vector(7 downto 0);
+    signal wr_tx_fifo_proc  : std_logic;
+    signal axi_wr_data      : std_logic_vector(31 downto 0);
+    signal wr_data_byte2    : std_logic_vector(7 downto 0);
+    signal wr_data_byte3    : std_logic_vector(7 downto 0);
+    signal wr_data_byte4    : std_logic_vector(7 downto 0);
     signal last_w_data_byte: std_logic;
 
     signal u_wr_addr        : std_logic_vector(31 downto 0);
@@ -120,26 +125,22 @@ architecture Behavioral of fsm_uart_bridge is
 ---------------------------- Architecture body --------------------------------
 begin
     send_rw_axi_proc    <= wr_tx_fifo_proc;
-	bus2ip_mstrd_d_i 	<= bus2ip_mstrd_d;
-	bus2ip_mst_cmplt_i	<= bus2ip_mst_cmplt;
-	bus2ip_mst_cmdack_i	<= bus2ip_mst_cmdack;
-	rx_fifo_rd_data_i	<= rx_fifo_rd_data;
-	
-	ip2bus_mstwr_req	<= ip2bus_mstwr_req_o; --master_write;
-	ip2bus_mstrd_req	<= ip2bus_mstrd_req_o; --master_read;
-
-	
-	tx_fifo_wr_data		<= fsm2uart_wr_data; 
-	tx_fifo_full_n		<= not tx_fifo_full;
-	tx_fifo_wr_en_i		<= '1' when ((tx_fifo_full_n = '1') and (wr_tx_fifo_proc = '1')) else '0';
-	tx_fifo_wr_en		<= tx_fifo_wr_en_i;
-	ip2bus_mst_addr		<= axi_addr;
-	ip2bus_mstwr_d		<= axi_wr_data;
-	u_wr_addr			<= axi_addr;
-	u_wr_data			<= axi_rd_data;
-
-	rx_fifo_rd_en_i		<= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
-	rx_fifo_rd_en		<= rx_fifo_rd_en_i;
+    bus2ip_mstrd_d_i    <= bus2ip_mstrd_d;
+    bus2ip_mst_cmplt_i  <= bus2ip_mst_cmplt;
+    bus2ip_mst_cmdack_i <= bus2ip_mst_cmdack;
+    rx_fifo_rd_data_i   <= rx_fifo_rd_data;
+    ip2bus_mstwr_req    <= ip2bus_mstwr_req_o; --master_write;
+    ip2bus_mstrd_req    <= ip2bus_mstrd_req_o; --master_read;
+    tx_fifo_wr_data     <= fsm2uart_wr_data; 
+    tx_fifo_full_n      <= not tx_fifo_full;
+    tx_fifo_wr_en_i     <= '1' when ((tx_fifo_full_n = '1') and (wr_tx_fifo_proc = '1')) else '0';
+    tx_fifo_wr_en       <= tx_fifo_wr_en_i;
+    ip2bus_mst_addr     <= axi_addr;
+    ip2bus_mstwr_d      <= axi_wr_data;
+    u_wr_addr           <= axi_addr;
+    u_wr_data           <= axi_rd_data;
+    rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
+    rx_fifo_rd_en       <= rx_fifo_rd_en_i;
 
     MSTWR_REQ_PROC : process(aclk, aresetn)
     begin
@@ -171,10 +172,10 @@ begin
     begin
         if aclk'event and aclk = '1' then
             if aresetn = '0' then
-            trx_req_ws		 <= '0';
+            trx_req_ws       <= '0';
             trx_req_wb_f     <= '0';
             trx_req_wb_i     <= '0';
-            trx_req_rs		 <= '0';
+            trx_req_rs       <= '0';
             trx_req_rb_f     <= '0';
             trx_req_rb_i     <= '0';
             
@@ -219,13 +220,13 @@ begin
         end if; 
     end process READ_START_BYTE_PROC;
 
--------------------------------------------------------------------------------	
+-------------------------------------------------------------------------------    
 --                           UART_STATE_PROCESS                              --
--------------------------------------------------------------------------------	
-    UART_STATE_PROCESS	: process (aclk, aresetn)
+-------------------------------------------------------------------------------    
+    UART_STATE_PROCESS  : process (aclk, aresetn)
     begin 
         if aresetn = '0' then
-            uart_state	<= START_BYTE;
+            uart_state  <= START_BYTE;
             elsif (aclk'event and aclk = '1') then
                 case uart_state is
                 when START_BYTE => 
@@ -374,20 +375,20 @@ begin
         end if;
     end process;
 ------------------------------------------------------------------------------------
---	axi address read from uart 
+--    axi address read from uart 
 ------------------------------------------------------------------------------------
     ADDR_REG_PROCESS : process(aclk, aresetn)
     begin
         if aclk'event and aclk = '1' then
             if aresetn = '0' then
-            axi_addr	<=(others => '0');
-            addr_byte2	<=(others => '0');
-            addr_byte3	<=(others => '0');
-            addr_byte4	<=(others => '0');
+            axi_addr    <=(others => '0');
+            addr_byte2    <=(others => '0');
+            addr_byte3    <=(others => '0');
+            addr_byte4    <=(others => '0');
             elsif (((rx_fifo_rd_en_i = '1') and (w_addr_phase = '1')) and (last_addr_byte ='0')) then
-            addr_byte2	<= rx_fifo_rd_data_i;
-            addr_byte3	<= addr_byte2;
-            addr_byte4	<= addr_byte3;
+            addr_byte2    <= rx_fifo_rd_data_i;
+            addr_byte3    <= addr_byte2;
+            addr_byte4    <= addr_byte3;
             elsif ((rx_fifo_rd_en_i = '1') and (last_addr_byte ='1')) then
             axi_addr(31 downto 0) <= (rx_fifo_rd_data_i & addr_byte2 & addr_byte3 & addr_byte4);
             else 
@@ -397,20 +398,20 @@ begin
     end process ADDR_REG_PROCESS;
 
 -----------------------------------------------------------------------------------
---	axi data read from uart
------------------------------------------------------------------------------------	
+--    axi data read from uart
+-----------------------------------------------------------------------------------    
     DATA_REG_PROCESS : process(aclk, aresetn)
     begin
         if aclk'event and aclk = '1' then
             if aresetn = '0' then
-            axi_wr_data		<=(others => '0'); 
-            wr_data_byte2	<=(others => '0');
-            wr_data_byte3	<=(others => '0');
-            wr_data_byte4	<=(others => '0');
+            axi_wr_data    <=(others => '0'); 
+            wr_data_byte2    <=(others => '0');
+            wr_data_byte3    <=(others => '0');
+            wr_data_byte4    <=(others => '0');
             elsif (((rx_fifo_rd_en_i = '1') and (w_data_phase = '1')) and (last_w_data_byte ='0')) then
-            wr_data_byte2	<= rx_fifo_rd_data_i;
-            wr_data_byte3	<= wr_data_byte2;
-            wr_data_byte4	<= wr_data_byte3;
+            wr_data_byte2    <= rx_fifo_rd_data_i;
+            wr_data_byte3    <= wr_data_byte2;
+            wr_data_byte4    <= wr_data_byte3;
             elsif ((rx_fifo_rd_en_i = '1') and (last_w_data_byte ='1')) then 
             axi_wr_data(31 downto 0) <= (rx_fifo_rd_data_i & wr_data_byte2 & wr_data_byte3 & wr_data_byte4);
             else 
@@ -420,7 +421,7 @@ begin
     end process DATA_REG_PROCESS;
 
 ----------------------------------------------------------------------------------
---	read data from axi
+--    read data from axi
 ----------------------------------------------------------------------------------
     RES_RD_DATA_PROCESS : process (aclk, aresetn)
     begin
@@ -436,222 +437,222 @@ begin
     end process RES_RD_DATA_PROCESS;
 
 ---------------------------------------------------------------------------------
---	state handler
+--    state handler
 ---------------------------------------------------------------------------------
 
     UART_PROCESS : process (uart_state) is
     begin
     case uart_state is
         when START_BYTE =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '1';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '1';
+                rd_rx_fifo_proc     <= '1';
         when U_ADDR_BYTE1 =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '1';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '1';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
                 
         when U_ADDR_BYTE2 => 
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '1';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '1';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when U_ADDR_BYTE3 =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '1';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '1';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when U_ADDR_BYTE4 =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '1';
-                w_addr_phase		<= '1';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '1';
+                w_addr_phase        <= '1';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE1 =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE2 =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE3 =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE4 =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '1';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '1';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '1';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when MST_WR =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '0';
-                master_write		<= '1';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '0';
+                master_write        <= '1';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when MST_RD =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '1';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '1';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE1 =>
-                fsm2uart_wr_data	<= axi_rd_data(7 downto 0);
-                wr_tx_fifo_proc		<= '1';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= axi_rd_data(7 downto 0);
+                wr_tx_fifo_proc     <= '1';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE2 =>
-                fsm2uart_wr_data	<= axi_rd_data(15 downto 8);
-                wr_tx_fifo_proc		<= '1';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= axi_rd_data(15 downto 8);
+                wr_tx_fifo_proc     <= '1';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE3 =>
-                fsm2uart_wr_data	<= axi_rd_data(23 downto 16);
-                wr_tx_fifo_proc		<= '1';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= axi_rd_data(23 downto 16);
+                wr_tx_fifo_proc     <= '1';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE4 =>
-                fsm2uart_wr_data	<= axi_rd_data(31 downto 24);
-                wr_tx_fifo_proc		<= '1';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '1';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= axi_rd_data(31 downto 24);
+                wr_tx_fifo_proc     <= '1';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '1';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when RESPONSE =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when INTR_PROC =>
-                fsm2uart_wr_data	<= (others => '0');
-                wr_tx_fifo_proc		<= '0';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when U_SEND_TR_TYPE =>
-                fsm2uart_wr_data	<= tr_type_i;
-                wr_tx_fifo_proc		<= '1';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '0';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= tr_type_i;
+                wr_tx_fifo_proc     <= '1';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when U_SEND_ADDR_BYTE1 =>
-                fsm2uart_wr_data	<= axi_addr(7 downto 0);
-                wr_tx_fifo_proc		<= '1';
-                last_w_data_byte	<= '0';
-                last_addr_byte		<= '0';
-                w_addr_phase		<= '1';
-                w_data_phase		<= '0';
-                master_write		<= '0';
-                master_read			<= '0';
-                start_byte_i		<= '0';
-                rd_rx_fifo_proc		<= '0';
+                fsm2uart_wr_data    <= axi_addr(7 downto 0);
+                wr_tx_fifo_proc     <= '1';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                w_addr_phase        <= '1';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '0';
         when U_SEND_ADDR_BYTE2 =>
                 fsm2uart_wr_data    <= axi_addr(15 downto 8);
                 wr_tx_fifo_proc     <= '1';
