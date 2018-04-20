@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+
+<!DOCTYPE doc SYSTEM "../../ipdialog.dtd" [
+    <!-- -->
+    <!ENTITY C_FAMILY '
+    <widget id="C_FAMILY">
+        <key>C_FAMILY</key>
+        <label>Target FPGA Architecture</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_M_AXI_LITE_DATA_WIDTH '
+    <widget id="C_M_AXI_LITE_DATA_WIDTH">
+        <key>C_M_AXI_LITE_DATA_WIDTH</key>
+        <label>AXI-Lite Master Data Width</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_M_AXI_LITE_ADDR_WIDTH '
+    <widget id="C_M_AXI_LITE_ADDR_WIDTH">
+        <key>C_M_AXI_LITE_ADDR_WIDTH</key>
+        <label>AXI-Lite Master Address Width</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_S_AXI_CLK_FREQ_HZ '
+    <widget id="C_S_AXI_CLK_FREQ_HZ">
+        <key>C_S_AXI_CLK_FREQ_HZ</key>
+        <label>AXI Clock Frequency (Hz)</label>
+        <tip></tip>
+        <unit>Hz</unit>
+    </widget>
+    '>
+
+    <!ENTITY C_HAS_INTR '
+    <widget id="C_HAS_INTR">
+        <key>C_HAS_INTR</key>
+        <label>Include interrupt vector</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_WIDTH '
+    <widget id="C_INTR_WIDTH">
+        <key>C_INTR_WIDTH</key>
+        <label>Width interrupt vector</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_0 '
+    <widget id="C_INTR_ADDR_0">
+        <key>C_INTR_ADDR_0</key>
+        <label>Base Address 0</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_1 '
+    <widget id="C_INTR_ADDR_1">
+        <key>C_INTR_ADDR_1</key>
+        <label>Base Address 1</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_2 '
+    <widget id="C_INTR_ADDR_2">
+        <key>C_INTR_ADDR_2</key>
+        <label>Base Address 2</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_3 '
+    <widget id="C_INTR_ADDR_3">
+        <key>C_INTR_ADDR_3</key>
+        <label>Base Address 3</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_4 '
+    <widget id="C_INTR_ADDR_4">
+        <key>C_INTR_ADDR_4</key>
+        <label>Base Address 4</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_5 '
+    <widget id="C_INTR_ADDR_5">
+        <key>C_INTR_ADDR_5</key>
+        <label>Base Address 5</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_6 '
+    <widget id="C_INTR_ADDR_6">
+        <key>C_INTR_ADDR_6</key>
+        <label>Base Address 6</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_INTR_ADDR_7 '
+    <widget id="C_INTR_ADDR_7">
+        <key>C_INTR_ADDR_7</key>
+        <label>Base Address 7</label>
+        <tip></tip>
+    </widget>
+    '>
+]>
+
+<doc>
+    <view id="User">
+        <display>User</display>
+        
+        <group id="AXI_lite master">
+            <display>AXI-Lite Master Settings</display>	
+            <item>&C_FAMILY;</item>
+            <item>&C_M_AXI_LITE_DATA_WIDTH;</item>
+            <item>&C_M_AXI_LITE_ADDR_WIDTH;</item>
+            <item>&C_S_AXI_CLK_FREQ_HZ;</item>
+C_S_AXI_CLK_FREQ_HZ
+        </group>
+        <group id="Interrupt">
+            <display>Interrupt input vector</display>	
+            <item>&C_HAS_INTR;</item>
+            <item>&C_INTR_WIDTH;</item>
+            <item>&C_INTR_ADDR_0;</item>
+            <item>&C_INTR_ADDR_1;</item>
+            <item>&C_INTR_ADDR_2;</item>
+            <item>&C_INTR_ADDR_3;</item>
+            <item>&C_INTR_ADDR_4;</item>
+            <item>&C_INTR_ADDR_5;</item>
+            <item>&C_INTR_ADDR_6;</item>
+            <item>&C_INTR_ADDR_7;</item>
+        </group>	
+    </view>
+ </doc>
