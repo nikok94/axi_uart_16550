@@ -21,10 +21,9 @@ library UNISIM;
 --------------------------- Entity declaration --------------------------------
 entity fsm_uart_bridge is
 generic (
-    generic map (
     C_AXI_RW_TIME_OUT       : integer := 500;
-    C_S_AXI_CLK_FREQ_HZ     : integer := 100_000_000;
-    )
+    C_S_AXI_CLK_FREQ_HZ     : integer := 100_000_000
+    );
 port (
     aclk                    : in  std_logic;
     aresetn                 : in  std_logic;
@@ -61,6 +60,8 @@ end entity fsm_uart_bridge;
 
 ----------------------- Architecture declaration ------------------------------
 architecture Behavioral of fsm_uart_bridge is
+    constant min_count      : integer := 0;
+    constant max_count      : integer := ((C_AXI_RW_TIME_OUT*C_S_AXI_CLK_FREQ_HZ)/1000);
 
     type   UART_STATE_TYPE is  (START_BYTE, U_ADDR_BYTE1, U_ADDR_BYTE2, U_ADDR_BYTE3,
                                 U_ADDR_BYTE4, U_WR_DATA_BYTE1, U_WR_DATA_BYTE2, U_WR_DATA_BYTE3, 
@@ -69,6 +70,9 @@ architecture Behavioral of fsm_uart_bridge is
                                 U_SEND_ADDR_BYTE2, U_SEND_ADDR_BYTE3,U_SEND_ADDR_BYTE4);
     signal uart_state      : UART_STATE_TYPE;
 
+    signal time_st_out     : std_logic;
+    signal time_out        : std_logic;
+    
     signal w_addr_phase    : std_logic;
     signal w_data_phase    : std_logic;
 
@@ -121,6 +125,7 @@ architecture Behavioral of fsm_uart_bridge is
     signal bus2ip_mstrd_d_i    : std_logic_vector(31 downto 0);
     signal ip2bus_mstwr_req_o  : std_logic;
     signal ip2bus_mstrd_req_o  : std_logic;
+    signal time_out_proc    : std_logic;
 
 ---------------------------- Architecture body --------------------------------
 begin
@@ -142,6 +147,24 @@ begin
     rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
     rx_fifo_rd_en       <= rx_fifo_rd_en_i;
 
+    TIME_OUT_REG_PROCESS : process (aclk, aresetn, time_st_out,time_out_proc)
+    variable cnt    : integer range min_count to max_count;
+    begin
+      if aresetn = '0' or time_out_proc = '0' then
+            cnt := 0;
+            time_st_out <= '0';
+        elsif aclk'event and aclk = '1' then
+          if cnt = max_count then
+            cnt := 0;
+            time_st_out <= '1';
+          else
+          time_st_out <= '0';
+          cnt := cnt +1;
+          end if;
+     end if;
+     time_out <= time_st_out;
+    end process TIME_OUT_REG_PROCESS;
+    
     MSTWR_REQ_PROC : process(aclk, aresetn)
     begin
       if aclk'event and aclk = '1' then
@@ -223,7 +246,7 @@ begin
 -------------------------------------------------------------------------------    
 --                           UART_STATE_PROCESS                              --
 -------------------------------------------------------------------------------    
-    UART_STATE_PROCESS  : process (aclk, aresetn)
+    UART_STATE_PROCESS  : process (aclk, aresetn, time_out)
     begin 
         if aresetn = '0' then
             uart_state  <= START_BYTE;
@@ -288,13 +311,17 @@ begin
                 when MST_WR =>
                     if bus2ip_mst_cmdack_i = '1' then
                     uart_state <= RESPONSE;
-                    else 
+                    elsif time_out = '1' then
+                    uart_state <= START_BYTE;
+                    else
                     uart_state <= MST_WR;
                     end if;
                 when MST_RD => 
                     if bus2ip_mst_cmdack_i = '1' then
                     uart_state <= RESPONSE;
-                    else 
+                    elsif time_out = '1' then
+                    uart_state <= START_BYTE;
+                    else
                     uart_state <= MST_RD;
                     end if;
                 when RESPONSE => 
@@ -304,6 +331,8 @@ begin
                     else
                     uart_state <= U_SEND_TR_TYPE;
                     end if;
+                    elsif time_out = '1' then
+                    uart_state <= START_BYTE;
                     else 
                     uart_state <= RESPONSE;
                     end if;
@@ -455,6 +484,7 @@ begin
                 start_byte_i        <= '1';
                 rd_rx_fifo_proc     <= '1';
         when U_ADDR_BYTE1 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -467,6 +497,7 @@ begin
                 rd_rx_fifo_proc     <= '1';
                 
         when U_ADDR_BYTE2 => 
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -478,6 +509,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '1';
         when U_ADDR_BYTE3 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -489,6 +521,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '1';
         when U_ADDR_BYTE4 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -500,6 +533,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE1 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -511,6 +545,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE2 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -522,6 +557,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE3 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -533,6 +569,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '1';
         when U_WR_DATA_BYTE4 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '1';
@@ -544,6 +581,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '1';
         when MST_WR =>
+                time_out_proc       <= '1';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -555,6 +593,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when MST_RD =>
+                time_out_proc       <= '1';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -566,6 +605,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE1 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_rd_data(7 downto 0);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -577,6 +617,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE2 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_rd_data(15 downto 8);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -588,6 +629,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE3 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_rd_data(23 downto 16);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -599,6 +641,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_RD_DATA_BYTE4 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_rd_data(31 downto 24);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -610,6 +653,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when RESPONSE =>
+                time_out_proc       <= '1';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -621,6 +665,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when INTR_PROC =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -632,6 +677,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_TR_TYPE =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= tr_type_i;
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -643,6 +689,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_ADDR_BYTE1 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_addr(7 downto 0);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -654,6 +701,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_ADDR_BYTE2 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_addr(15 downto 8);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -665,6 +713,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_ADDR_BYTE3 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_addr(23 downto 16);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -676,6 +725,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when U_SEND_ADDR_BYTE4 =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= axi_addr(31 downto 24);
                 wr_tx_fifo_proc     <= '1';
                 last_w_data_byte    <= '0';
@@ -687,6 +737,7 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when others =>
+                time_out_proc       <= '0';
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
