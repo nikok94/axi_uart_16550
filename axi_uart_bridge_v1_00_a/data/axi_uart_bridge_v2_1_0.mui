@@ -51,59 +51,103 @@
     <!ENTITY C_INTR_ADDR_0 '
     <widget id="C_INTR_ADDR_0">
         <key>C_INTR_ADDR_0</key>
-        <label>Base Address 0</label>
+        <label>IP Interrupt Base Address 0</label>
         <tip></tip>
     </widget>
     '>
     <!ENTITY C_INTR_ADDR_1 '
     <widget id="C_INTR_ADDR_1">
         <key>C_INTR_ADDR_1</key>
-        <label>Base Address 1</label>
+        <label>IP Interrupt Base Address 1</label>
         <tip></tip>
     </widget>
     '>
     <!ENTITY C_INTR_ADDR_2 '
     <widget id="C_INTR_ADDR_2">
         <key>C_INTR_ADDR_2</key>
-        <label>Base Address 2</label>
+        <label>IP Interrupt Base Address 2</label>
         <tip></tip>
     </widget>
     '>
     <!ENTITY C_INTR_ADDR_3 '
     <widget id="C_INTR_ADDR_3">
         <key>C_INTR_ADDR_3</key>
-        <label>Base Address 3</label>
+        <label>IP Interrupt Base Address 3</label>
         <tip></tip>
     </widget>
     '>
     <!ENTITY C_INTR_ADDR_4 '
     <widget id="C_INTR_ADDR_4">
         <key>C_INTR_ADDR_4</key>
-        <label>Base Address 4</label>
+        <label>IP Interrupt Base Address 4</label>
         <tip></tip>
     </widget>
     '>
     <!ENTITY C_INTR_ADDR_5 '
     <widget id="C_INTR_ADDR_5">
         <key>C_INTR_ADDR_5</key>
-        <label>Base Address 5</label>
+        <label>IP Interrupt Base Address 5</label>
         <tip></tip>
     </widget>
     '>
     <!ENTITY C_INTR_ADDR_6 '
     <widget id="C_INTR_ADDR_6">
         <key>C_INTR_ADDR_6</key>
-        <label>Base Address 6</label>
+        <label>IP Interrupt Base Address 6</label>
         <tip></tip>
     </widget>
     '>
     <!ENTITY C_INTR_ADDR_7 '
     <widget id="C_INTR_ADDR_7">
         <key>C_INTR_ADDR_7</key>
-        <label>Base Address 7</label>
+        <label>IP Interrupt Base Address 7</label>
         <tip></tip>
     </widget>
     '>
+	<!ENTITY C_AXI_RW_TIME_OUT '
+    <widget id="C_AXI_RW_TIME_OUT">
+        <key>C_AXI_RW_TIME_OUT</key>
+        <label>Time Out from Read/Write transaction (ms)</label>
+        <tip></tip>
+        <unit>ms</unit>
+    </widget>
+    '>
+    <!ENTITY C_RFTL '
+    <widget id="C_RFTL">
+        <key>C_RFTL</key>
+        <label>RCVR FIFO Trigger Level (byte)</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_UART_BAUD_RATE '
+    <widget id="C_UART_BAUD_RATE">
+        <key>C_UART_BAUD_RATE</key>
+        <label>Uart Baud Rate (baud/s)</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_HAS_EXTERNAL_RCLK '
+    <widget id="C_HAS_EXTERNAL_RCLK">
+        <key>C_HAS_EXTERNAL_RCLK</key>
+        <label>Include External RCLK</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_WLS '
+    <widget id="C_WLS">
+        <key>C_WLS</key>
+        <label>Word Length Select (bit)</label>
+        <tip></tip>
+    </widget>
+    '>
+    <!ENTITY C_STB '
+    <widget id="C_STB">
+        <key>C_STB</key>
+        <label>Number of Stop Bits (bit)</label>
+        <tip></tip>
+    </widget>
+    '>
+    
 ]>
 
 <doc>
@@ -116,8 +160,16 @@
             <item>&C_M_AXI_LITE_DATA_WIDTH;</item>
             <item>&C_M_AXI_LITE_ADDR_WIDTH;</item>
             <item>&C_S_AXI_CLK_FREQ_HZ;</item>
-C_S_AXI_CLK_FREQ_HZ
         </group>
+        <group id="Uart Settings">
+            <display>Uart 16550 Settings</display>
+            <item>&C_AXI_RW_TIME_OUT;</item>
+            <item>&C_RFTL;</item>
+            <item>&C_UART_BAUD_RATE;</item>
+            <item>&C_HAS_EXTERNAL_RCLK;</item>
+            <item>&C_WLS;</item>
+            <item>&C_STB;</item>
+        </group>	
         <group id="Interrupt">
             <display>Interrupt input vector</display>	
             <item>&C_HAS_INTR;</item>
