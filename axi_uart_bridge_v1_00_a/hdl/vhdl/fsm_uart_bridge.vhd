@@ -1,3 +1,4 @@
+
 -------------------------------------------------------------------------------
 -- Company: 
 -- Engineer: 
@@ -39,6 +40,7 @@ port (
     ip2bus_mstrd_req        : out std_logic;
     ip2bus_mstwr_req        : out std_logic;
     ip2bus_mst_addr         : out std_logic_vector(31 downto 0);
+	 ip2bus_mst_reset			 : out std_logic;
 
     bus2ip_mst_cmdack       : in  std_logic;
     bus2ip_mst_cmplt        : in  std_logic;
@@ -54,7 +56,7 @@ port (
 
     send_rw_axi_proc        : out std_logic;
     send_intr_proc          : in  std_logic
-    );
+	   );
 end entity fsm_uart_bridge;
 
 
@@ -108,7 +110,7 @@ architecture Behavioral of fsm_uart_bridge is
     signal wr_data_byte2    : std_logic_vector(7 downto 0);
     signal wr_data_byte3    : std_logic_vector(7 downto 0);
     signal wr_data_byte4    : std_logic_vector(7 downto 0);
-    signal last_w_data_byte: std_logic;
+    signal last_w_data_byte : std_logic;
 
     signal u_wr_addr        : std_logic_vector(31 downto 0);
     signal u_wr_data        : std_logic_vector(31 downto 0);
@@ -148,7 +150,8 @@ begin
     u_wr_data           <= axi_rd_data;
     rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
     rx_fifo_rd_en       <= rx_fifo_rd_en_i;
-
+	 ip2bus_mst_reset		<= time_out;
+	 
     TIME_OUT_REG_PROCESS : process (aclk, aresetn, time_st_out,time_out_proc, top_en)
     variable cnt    : integer range min_count to max_count;
     begin

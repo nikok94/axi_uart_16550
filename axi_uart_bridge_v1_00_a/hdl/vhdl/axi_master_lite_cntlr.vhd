@@ -388,7 +388,7 @@ begin --(architecture implementation)
   
    
   -- AXI4 Write Response Channel port assignments
-  m_axi_bready       <= sig_m_axi_bready  ;
+   m_axi_bready       <= sig_m_axi_bready  ;
   sig_m_axi_bvalid   <= m_axi_bvalid      ;
   sig_m_axi_bresp    <= m_axi_bresp       ;
    

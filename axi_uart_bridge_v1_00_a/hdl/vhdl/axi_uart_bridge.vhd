@@ -90,7 +90,8 @@ architecture Behavioral of axi_uart_bridge is
     signal ip2bus_mstrd_req        : std_logic;
     signal ip2bus_mstwr_req        : std_logic;
     signal ip2bus_mst_addr         : std_logic_vector(31 downto 0);
-
+    signal ip2bus_mst_reset		  : std_logic;
+	 
     signal bus2ip_mst_cmdack       : std_logic;
     signal bus2ip_mst_cmplt        : std_logic;
     signal bus2ip_mst_error        : std_logic;
@@ -105,9 +106,11 @@ architecture Behavioral of axi_uart_bridge is
     signal md_error                : std_logic;-- Discrete Out
     signal send_intr_proc          : std_logic;
     signal send_rw_axi_proc        : std_logic;
+	 
 
 
 begin
+	 
     INCLUDE_VEC_INTRPT : if HAS_INTR = 1 generate
 
 INTR_inst : entity axi_uart_bridge_v1_00_a.uart_interrupt_control
@@ -199,6 +202,7 @@ FSM_inst : entity axi_uart_bridge_v1_00_a.fsm_uart_bridge
         ip2bus_mstrd_req        => ip2bus_mstrd_req,
         ip2bus_mstwr_req        => ip2bus_mstwr_req,
         ip2bus_mst_addr         => ip2bus_mst_addr,
+		  ip2bus_mst_reset		  => ip2bus_mst_reset,
         bus2ip_mst_cmdack       => bus2ip_mst_cmdack,
         bus2ip_mst_cmplt        => bus2ip_mst_cmplt,
         bus2ip_mst_error        => bus2ip_mst_error,
@@ -220,7 +224,7 @@ axi_master_inst : entity axi_uart_bridge_v1_00_a.axi_master_lite
     )
     port map (
         m_axi_lite_aclk         => aclk         ,
-        m_axi_lite_aresetn      => aresetn      ,
+        m_axi_lite_aresetn      => aresetn		  ,
         md_error                => md_error     ,
         m_axi_lite_arready      => M_AXI_ARREADY,
         m_axi_lite_arvalid      => M_AXI_ARVALID,
@@ -247,7 +251,7 @@ axi_master_inst : entity axi_uart_bridge_v1_00_a.axi_master_lite
         ip2bus_mst_addr         => ip2bus_mst_addr ,
         ip2bus_mst_be           => "1111"          ,
         ip2bus_mst_lock         => '0'             ,
-        ip2bus_mst_reset        => '0'             ,
+        ip2bus_mst_reset        => ip2bus_mst_reset,
 
         bus2ip_mst_cmdack       => bus2ip_mst_cmdack     ,
         bus2ip_mst_cmplt        => bus2ip_mst_cmplt      ,
