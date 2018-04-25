@@ -16,12 +16,11 @@ entity axi_uart_bridge is
     generic (
         C_M_AXI_LITE_ADDR_WIDTH : INTEGER range 32 to 32        := 32;
         C_M_AXI_LITE_DATA_WIDTH : INTEGER range 32 to 32        := 32;
+        C_M_AXI_LITE_CLK_FREQ_HZ     : integer                       := 100_000_000;
 
-        C_AXI_RW_TIME_OUT       : INTEGER                       := 500; -- time out read/write data from axi 
-
+        C_AXI_RW_TIME_OUT       : INTEGER                       := 1; -- time out read/write data from axi 
         C_FAMILY                : string                        := "spartan6";
         C_RFTL                  : integer                       := 8;   
-        C_S_AXI_CLK_FREQ_HZ     : integer                       := 100_000_000;
         C_UART_BAUD_RATE        : integer                       := 9600;
         C_HAS_EXTERNAL_RCLK     : integer range 0 to 1          := 0;
         C_WLS                   : integer range 5 to 8          := 8;
@@ -151,7 +150,7 @@ xuart_inst : entity axi_uart_bridge_v1_00_a.xuart
     generic map (
         C_FAMILY                => C_FAMILY,
         C_RFTL                  => C_RFTL,
-        C_S_AXI_CLK_FREQ_HZ     => C_S_AXI_CLK_FREQ_HZ,
+        C_S_AXI_CLK_FREQ_HZ     => C_M_AXI_LITE_CLK_FREQ_HZ,
         C_UART_BAUD_RATE        => C_UART_BAUD_RATE,
         C_HAS_EXTERNAL_RCLK     => C_HAS_EXTERNAL_RCLK /= 0,
         C_WLS                   => C_WLS,
@@ -188,7 +187,7 @@ xuart_inst : entity axi_uart_bridge_v1_00_a.xuart
 FSM_inst : entity axi_uart_bridge_v1_00_a.fsm_uart_bridge
     generic map (
         C_AXI_RW_TIME_OUT       => C_AXI_RW_TIME_OUT,
-        C_S_AXI_CLK_FREQ_HZ     => C_S_AXI_CLK_FREQ_HZ
+        C_S_AXI_CLK_FREQ_HZ     => C_M_AXI_LITE_CLK_FREQ_HZ
     )
     port map (
         aclk                    => aclk,
