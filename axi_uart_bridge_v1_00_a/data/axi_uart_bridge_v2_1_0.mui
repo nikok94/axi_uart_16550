@@ -25,9 +25,9 @@
         <tip></tip>
     </widget>
     '>
-    <!ENTITY C_S_AXI_CLK_FREQ_HZ '
-    <widget id="C_S_AXI_CLK_FREQ_HZ">
-        <key>C_S_AXI_CLK_FREQ_HZ</key>
+    <!ENTITY C_M_AXI_LITE_CLK_FREQ_HZ '
+    <widget id="C_M_AXI_LITE_CLK_FREQ_HZ">
+        <key>C_M_AXI_LITE_CLK_FREQ_HZ</key>
         <label>AXI Clock Frequency (Hz)</label>
         <tip></tip>
         <unit>Hz</unit>
@@ -159,7 +159,7 @@
             <item>&C_FAMILY;</item>
             <item>&C_M_AXI_LITE_DATA_WIDTH;</item>
             <item>&C_M_AXI_LITE_ADDR_WIDTH;</item>
-            <item>&C_S_AXI_CLK_FREQ_HZ;</item>
+            <item>&C_M_AXI_LITE_CLK_FREQ_HZ;</item>
         </group>
         <group id="Uart Settings">
             <display>Uart 16550 Settings</display>
