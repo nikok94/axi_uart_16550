@@ -18,7 +18,6 @@ entity axi_uart_bridge is
         C_M_AXI_LITE_DATA_WIDTH : INTEGER range 32 to 32        := 32;
         C_M_AXI_LITE_CLK_FREQ_HZ     : integer                       := 100_000_000;
 
-        C_AXI_RW_TIME_OUT       : INTEGER                       := 1; -- time out read/write data from axi 
         C_FAMILY                : string                        := "spartan6";
         C_RFTL                  : integer                       := 8;   
         C_UART_BAUD_RATE        : integer                       := 9600;
@@ -186,7 +185,9 @@ xuart_inst : entity axi_uart_bridge_v1_00_a.xuart
 
 FSM_inst : entity axi_uart_bridge_v1_00_a.fsm_uart_bridge
     generic map (
-        C_AXI_RW_TIME_OUT       => C_AXI_RW_TIME_OUT,
+        C_WLS                   => C_WLS,
+        C_STB                   => C_STB,
+        C_UART_BAUD_RATE        => C_UART_BAUD_RATE,
         C_S_AXI_CLK_FREQ_HZ     => C_M_AXI_LITE_CLK_FREQ_HZ
     )
     port map (
@@ -201,7 +202,7 @@ FSM_inst : entity axi_uart_bridge_v1_00_a.fsm_uart_bridge
         ip2bus_mstrd_req        => ip2bus_mstrd_req,
         ip2bus_mstwr_req        => ip2bus_mstwr_req,
         ip2bus_mst_addr         => ip2bus_mst_addr,
-		  ip2bus_mst_reset		  => ip2bus_mst_reset,
+        ip2bus_mst_reset        => ip2bus_mst_reset,
         bus2ip_mst_cmdack       => bus2ip_mst_cmdack,
         bus2ip_mst_cmplt        => bus2ip_mst_cmplt,
         bus2ip_mst_error        => bus2ip_mst_error,
@@ -223,7 +224,7 @@ axi_master_inst : entity axi_uart_bridge_v1_00_a.axi_master_lite
     )
     port map (
         m_axi_lite_aclk         => aclk         ,
-        m_axi_lite_aresetn      => aresetn		  ,
+        m_axi_lite_aresetn      => aresetn      ,
         md_error                => md_error     ,
         m_axi_lite_arready      => M_AXI_ARREADY,
         m_axi_lite_arvalid      => M_AXI_ARVALID,
