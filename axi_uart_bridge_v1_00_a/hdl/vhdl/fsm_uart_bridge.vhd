@@ -211,37 +211,37 @@ begin
             
             elsif (start_byte_i = '1') and (rx_fifo_rd_en_i = '1') then
                 tr_type_i <= rx_fifo_rd_data_i;
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"000") then 
+                if (rx_fifo_rd_data_i = trx_type & '0' & B"000") then   -- single read
                     trx_req_rs <= '1';
                     else 
                     trx_req_rs <= '0';
                 end if;
     
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"001") then 
+                if (rx_fifo_rd_data_i = trx_type & '0' & B"001") then   -- packet reading with address incrementing
                     trx_req_rb_i <= '1';
                     else 
                     trx_req_rb_i <= '0';
                 end if;
     
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"010") then 
+                if (rx_fifo_rd_data_i = trx_type & '0' & B"010") then   -- batch read with fixed
                     trx_req_rb_f <= '1';
                     else 
                     trx_req_rb_f <= '0';
                 end if;
     
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"100") then 
+                if (rx_fifo_rd_data_i = trx_type & '0' & B"100") then   -- single write
                     trx_req_ws <= '1';
                     else 
                     trx_req_ws <= '0';
                 end if;
     
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"101") then 
+                if (rx_fifo_rd_data_i = trx_type & '0' & B"101") then   -- packet writing with address incrementing
                     trx_req_wb_i <= '1';
                     else 
                     trx_req_wb_i <= '0';
                 end if;
     
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"110") then 
+                if (rx_fifo_rd_data_i = trx_type & '0' & B"110") then   -- batch write with fixed
                     trx_req_wb_f <= '1';
                     else 
                     trx_req_wb_f <= '0';

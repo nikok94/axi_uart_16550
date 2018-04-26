@@ -107,9 +107,9 @@
 	<!ENTITY C_AXI_RW_TIME_OUT '
     <widget id="C_AXI_RW_TIME_OUT">
         <key>C_AXI_RW_TIME_OUT</key>
-        <label>Time Out from Read/Write transaction (ms)</label>
+        <label>Time Out from Read/Write transaction (µs)</label>
         <tip></tip>
-        <unit>ms</unit>
+        <unit>µs</unit>
     </widget>
     '>
     <!ENTITY C_RFTL '
