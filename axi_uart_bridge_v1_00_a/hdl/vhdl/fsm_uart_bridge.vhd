@@ -64,7 +64,7 @@ end entity fsm_uart_bridge;
 
 ----------------------- Architecture declaration ------------------------------
 architecture Behavioral of fsm_uart_bridge is
-    constant max_count      : integer := (C_S_AXI_CLK_FREQ_HZ*(C_WLS+C_STB+1))/C_UART_BAUD_RATE;
+    constant max_count      : integer := 2*(C_S_AXI_CLK_FREQ_HZ*(C_WLS+C_STB+1))/C_UART_BAUD_RATE;
     constant max_count_x    : std_logic_vector(15 downto 0):= CONV_STD_LOGIC_VECTOR(max_count,16); 
 
     type   UART_STATE_TYPE is  (START_BYTE, U_ADDR_BYTE1, U_ADDR_BYTE2, U_ADDR_BYTE3,
@@ -175,7 +175,7 @@ begin
         time_out_counter <= time_out_counter - "000000000000001";
         end if;
       end if;
-     time_out <= time_st_out;
+     time_out <= '0'; --time_st_out;
     end process TIME_OUT_REG_PROCESS;
     
     MSTWR_REQ_PROC : process(aclk, aresetn)
