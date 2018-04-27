@@ -13,6 +13,8 @@
 
 library IEEE;
   use IEEE.STD_LOGIC_1164.ALL;
+  use ieee.std_logic_unsigned."+"; 
+  use ieee.std_logic_unsigned."-"; 
   use ieee.numeric_std.all;
 
 library UNISIM;
@@ -22,7 +24,9 @@ library UNISIM;
 --------------------------- Entity declaration --------------------------------
 entity fsm_uart_bridge is
 generic (
-    C_AXI_RW_TIME_OUT       : integer := 500;
+    C_UART_BAUD_RATE        : integer                       := 9600;
+    C_WLS                   : integer range 5 to 8          := 8;
+    C_STB                   : integer range 1 to 2          := 1;
     C_S_AXI_CLK_FREQ_HZ     : integer := 100_000_000
     );
 port (
@@ -63,7 +67,7 @@ end entity fsm_uart_bridge;
 ----------------------- Architecture declaration ------------------------------
 architecture Behavioral of fsm_uart_bridge is
     constant min_count      : integer := 0;
-    constant max_count      : integer := ((C_AXI_RW_TIME_OUT*C_S_AXI_CLK_FREQ_HZ)/1000);
+    constant max_count      : integer := ((C_S_AXI_CLK_FREQ_HZ*(C_WLS+C_STB+1))/C_UART_BAUD_RATE + (C_S_AXI_CLK_FREQ_HZ/C_UART_BAUD_RATE));
 
     type   UART_STATE_TYPE is  (START_BYTE, U_ADDR_BYTE1, U_ADDR_BYTE2, U_ADDR_BYTE3,
                                 U_ADDR_BYTE4, U_WR_DATA_BYTE1, U_WR_DATA_BYTE2, U_WR_DATA_BYTE3, 

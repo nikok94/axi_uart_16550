@@ -104,14 +104,6 @@
         <tip></tip>
     </widget>
     '>
-	<!ENTITY C_AXI_RW_TIME_OUT '
-    <widget id="C_AXI_RW_TIME_OUT">
-        <key>C_AXI_RW_TIME_OUT</key>
-        <label>Time Out from Read/Write transaction (ms)</label>
-        <tip></tip>
-        <unit>ms</unit>
-    </widget>
-    '>
     <!ENTITY C_RFTL '
     <widget id="C_RFTL">
         <key>C_RFTL</key>
@@ -163,7 +155,6 @@
         </group>
         <group id="Uart Settings">
             <display>Uart 16550 Settings</display>
-            <item>&C_AXI_RW_TIME_OUT;</item>
             <item>&C_RFTL;</item>
             <item>&C_UART_BAUD_RATE;</item>
             <item>&C_HAS_EXTERNAL_RCLK;</item>
