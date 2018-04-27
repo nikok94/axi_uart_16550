@@ -67,7 +67,7 @@ end entity fsm_uart_bridge;
 ----------------------- Architecture declaration ------------------------------
 architecture Behavioral of fsm_uart_bridge is
     constant min_count      : integer := 0;
-    constant max_count      : integer := ((C_S_AXI_CLK_FREQ_HZ*(C_WLS+C_STB+1))/C_UART_BAUD_RATE + (C_S_AXI_CLK_FREQ_HZ/C_UART_BAUD_RATE));
+    constant max_count      : integer := (C_S_AXI_CLK_FREQ_HZ)/1000;
 
     type   UART_STATE_TYPE is  (START_BYTE, U_ADDR_BYTE1, U_ADDR_BYTE2, U_ADDR_BYTE3,
                                 U_ADDR_BYTE4, U_WR_DATA_BYTE1, U_WR_DATA_BYTE2, U_WR_DATA_BYTE3, 
