@@ -162,22 +162,22 @@ begin
     
     len_equally         <= '1' when len_count = axi_tr_len else '0';
 
---    TIME_OUT_REG_PROCESS : process (aclk)
---    begin
---      if ((aresetn = '0' or time_out_proc = '0') or (rx_fifo_rd_en_i = '1' or tx_fifo_wr_en_i = '1'))then
---      time_out_counter <= max_count_x;
---      time_st_out <= '0';
---      elsif aclk'event and aclk = '1' then
---        if time_out_counter = "000000000000001" then
---        time_st_out <= '1';
---        else
---        time_st_out <= '0';
---        time_out_counter <= time_out_counter - "000000000000001";
---        end if;
---      end if;
---     time_out <= '0'; --time_st_out;
---    end process TIME_OUT_REG_PROCESS;
-    time_out <= '0';
+    TIME_OUT_REG_PROCESS : process (aclk)
+    begin
+      if ((aresetn = '0' or time_out_proc = '0') or (rx_fifo_rd_en_i = '1' or tx_fifo_wr_en_i = '1'))then
+      time_out_counter <= max_count_x;
+      time_st_out <= '0';
+      elsif aclk'event and aclk = '1' then
+        if time_out_counter = "000000000000001" then
+        time_st_out <= '1';
+        else
+        time_st_out <= '0';
+        time_out_counter <= time_out_counter - "000000000000001";
+        end if;
+      end if;
+     time_out <= time_st_out;
+    end process TIME_OUT_REG_PROCESS;
+--    time_out <= '0';
     
     MSTWR_REQ_PROC : process(aclk, aresetn)
     begin
