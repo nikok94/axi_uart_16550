@@ -413,16 +413,16 @@ begin
                         uart_state <= START_BYTE;
                         elsif trx_req_wb_i = '1' then
                             if (len_count = axi_tr_len - 1) then
-                            len_count <= (others => '0');
+                            len_count <= (len_count + 1);
                             uart_state <= U_SEND_TR_TYPE;
                             else
-                            len_count <= len_count + 1;
+                            len_count <= (len_count + 1);
                             axi_addr_incr <= axi_addr_incr + x"0000_0004";
                             uart_state <= U_WR_DATA_BYTE1;
                             end if;
                         elsif trx_req_wb_f = '1' then 
                             if (len_count = axi_tr_len - 1) then
-                            len_count <= (others => '0');
+                            len_count <= (len_count + 1);
                             uart_state <= U_SEND_TR_TYPE;
                             else
                             len_count <= len_count + 1;
@@ -461,7 +461,7 @@ begin
                     if ((send_intr_proc and not wr_tx_fifo_proc) = '0') then
                         if time_out = '1' then
                             uart_state <= START_BYTE;
-                        elsif  trx_req_wb_i = '1' then
+                        elsif trx_req_wb_i = '1' then
                             if (len_count = axi_tr_len - 1) then
                             len_count <= (others => '0');
                             uart_state <= U_SEND_TR_TYPE;
@@ -483,6 +483,7 @@ begin
                             if len_count = x"0000_0000" then
                             len_count <= len_count + 1;
                             uart_state <= U_SEND_TR_TYPE;
+                            axi_addr_incr<= axi_addr_incr + x"0000_0004";
                             else
                             len_count <= len_count + 1;
                             axi_addr_incr<= axi_addr_incr + x"0000_0004";
