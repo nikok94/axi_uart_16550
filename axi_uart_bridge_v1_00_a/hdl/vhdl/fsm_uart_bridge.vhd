@@ -80,8 +80,8 @@ architecture Behavioral of fsm_uart_bridge is
     signal w_addr_phase    : std_logic;
     signal w_data_phase    : std_logic;
     signal w_len_phase     : std_logic;
-    signal trx_type        : std_logic_vector(3 downto 0):= B"0010";
-    signal intr_type       : std_logic_vector(3 downto 0):= B"0011";
+    signal trx_type        : std_logic_vector(3 downto 0):= B"1010";
+    signal intr_type       : std_logic_vector(3 downto 0):= B"1011";
     signal start_byte_i    : std_logic;
     signal rx_fifo_rd_en_i : std_logic:= '0';
     signal rd_rx_fifo_proc : std_logic;
