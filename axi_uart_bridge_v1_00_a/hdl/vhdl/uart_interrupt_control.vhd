@@ -89,7 +89,7 @@ architecture Behavioral of uart_interrupt_control is
     signal u_s_intr_6           : std_logic:='0';
     signal u_s_intr_7           : std_logic:='0';
 
-    signal INTR_TYPE            : std_logic_vector(7 downto 0):= B"00110000";
+    signal INTR_TYPE            : std_logic_vector(7 downto 0):= B"10110000";
 
     signal tx_fifo_wr_en_i      : std_logic;
     signal send_intr_proc_i     : std_logic;

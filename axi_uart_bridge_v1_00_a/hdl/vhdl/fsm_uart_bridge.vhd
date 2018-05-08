@@ -141,7 +141,7 @@ architecture Behavioral of fsm_uart_bridge is
 
 ---------------------------- Architecture body --------------------------------
 begin
-    send_rw_axi_proc    <= wr_tx_fifo_proc;
+    send_rw_axi_proc    <= not start_byte_i;
     bus2ip_mstrd_d_i    <= bus2ip_mstrd_d;
     bus2ip_mst_cmplt_i  <= bus2ip_mst_cmplt;
     bus2ip_mst_cmdack_i <= bus2ip_mst_cmdack;
@@ -156,7 +156,7 @@ begin
     ip2bus_mstwr_d      <= axi_wr_data;
     u_wr_addr           <= axi_addr;
     u_wr_data           <= axi_rd_data;
-    rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
+    rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1'))) else '0';
     rx_fifo_rd_en       <= rx_fifo_rd_en_i;
     ip2bus_mst_reset    <= time_out;
     
@@ -272,10 +272,20 @@ begin
                 case uart_state is
                 when START_BYTE => 
                     len_count <= (others => '0');
-                    if (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_ADDR_BYTE1;
-                    else 
-                    uart_state <= START_BYTE;
+                    if send_intr_proc = '1' then 
+                      uart_state <= INTR_PROC; 
+                    else
+                      if (rx_fifo_rd_en_i = '1') then
+                        uart_state <= U_ADDR_BYTE1;
+                      else 
+                        uart_state <= START_BYTE;
+                      end if;
+                    end if;
+                when INTR_PROC =>
+                    if send_intr_proc = '0' then
+                      uart_state <= START_BYTE;
+                    else
+                      uart_state <= INTR_PROC;
                     end if;
                 when U_ADDR_BYTE1 =>
                     if time_out = '1' then
@@ -406,10 +416,7 @@ begin
                     end if;
                 when RESPONSE =>
                     if (bus2ip_mst_cmplt_i = '1') then
-                      if ((send_intr_proc and not wr_tx_fifo_proc) = '1') then
-                      uart_state <= INTR_PROC;
-                      else 
-                        if time_out = '1' then
+                      if time_out = '1' then
                         uart_state <= START_BYTE;
                         elsif trx_req_wb_i = '1' then
                             if (len_count = axi_tr_len - 1) then
@@ -453,58 +460,8 @@ begin
                         else 
                         uart_state <= START_BYTE;
                         end if;
-                      end if;
                     else 
                         uart_state <= RESPONSE;
-                    end if;
-                when INTR_PROC =>
-                    if ((send_intr_proc and not wr_tx_fifo_proc) = '0') then
-                        if time_out = '1' then
-                            uart_state <= START_BYTE;
-                        elsif trx_req_wb_i = '1' then
-                            if (len_count = axi_tr_len - 1) then
-                            len_count <= (others => '0');
-                            uart_state <= U_SEND_TR_TYPE;
-                            else
-                            len_count <= len_count + 1;
-                            axi_addr_incr <= axi_addr_incr + x"0000_0004";
-                            uart_state <= U_WR_DATA_BYTE1;
-                            end if;
-                        elsif trx_req_wb_f = '1' then 
-                            if (len_count = axi_tr_len - 1) then
-                            len_count <= (others => '0');
-                            uart_state <= U_SEND_TR_TYPE;
-                            else
-                            len_count <= len_count + 1;
-                            axi_addr_incr <= axi_addr;
-                            uart_state <= U_WR_DATA_BYTE1;
-                            end if;
-                        elsif trx_req_rb_i = '1' then
-                            if len_count = x"0000_0000" then
-                            len_count <= len_count + 1;
-                            uart_state <= U_SEND_TR_TYPE;
-                            axi_addr_incr<= axi_addr_incr + x"0000_0004";
-                            else
-                            len_count <= len_count + 1;
-                            axi_addr_incr<= axi_addr_incr + x"0000_0004";
-                            uart_state <= U_SEND_RD_DATA_BYTE1;
-                            end if;
-                        elsif trx_req_rb_f = '1' then
-                            if len_count = x"0000_0000" then
-                            len_count <= len_count + 1;
-                            uart_state <= U_SEND_TR_TYPE;
-                            else
-                            len_count <= len_count + 1;
-                            axi_addr_incr <= axi_addr;
-                            uart_state <= U_SEND_RD_DATA_BYTE1;
-                            end if;
-                        elsif trx_burst_mode = '0' then
-                        uart_state <= U_SEND_TR_TYPE;
-                        else 
-                        uart_state <= START_BYTE;
-                        end if;
-                    else
-                    uart_state <= INTR_PROC;
                     end if;
                 when U_SEND_TR_TYPE => 
                     if time_out = '1' then
@@ -721,7 +678,6 @@ begin
     case uart_state is
         when START_BYTE =>
                 time_out_proc       <= '0';
-
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -734,9 +690,22 @@ begin
                 master_read         <= '0';
                 start_byte_i        <= '1';
                 rd_rx_fifo_proc     <= '1';
+        when INTR_PROC =>
+                time_out_proc       <= '0';
+                fsm2uart_wr_data    <= (others => '0');
+                wr_tx_fifo_proc     <= '0';
+                last_w_data_byte    <= '0';
+                last_addr_byte      <= '0';
+                last_len_byte       <= '0';
+                w_len_phase         <= '0';
+                w_addr_phase        <= '0';
+                w_data_phase        <= '0';
+                master_write        <= '0';
+                master_read         <= '0';
+                start_byte_i        <= '1';
+                rd_rx_fifo_proc     <= '0';
         when U_ADDR_BYTE1 =>
                 time_out_proc       <= '1';
-
                 fsm2uart_wr_data    <= (others => '0');
                 wr_tx_fifo_proc     <= '0';
                 last_w_data_byte    <= '0';
@@ -748,6 +717,7 @@ begin
                 master_write        <= '0';
                 master_read         <= '0';
                 start_byte_i        <= '0';
+                rd_rx_fifo_proc     <= '1';
         when U_ADDR_BYTE2 => 
                 time_out_proc       <= '1';
 
