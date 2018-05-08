@@ -156,7 +156,7 @@ begin
     ip2bus_mstwr_d      <= axi_wr_data;
     u_wr_addr           <= axi_addr;
     u_wr_data           <= axi_rd_data;
-    rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1'))) else '0';
+    rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
     rx_fifo_rd_en       <= rx_fifo_rd_en_i;
     ip2bus_mst_reset    <= time_out;
     
@@ -274,12 +274,10 @@ begin
                     len_count <= (others => '0');
                     if send_intr_proc = '1' then 
                       uart_state <= INTR_PROC; 
-                    else
-                      if (rx_fifo_rd_en_i = '1') then
-                        uart_state <= U_ADDR_BYTE1;
-                      else 
-                        uart_state <= START_BYTE;
-                      end if;
+                    elsif (rx_fifo_rd_en_i = '1') then
+                      uart_state <= U_ADDR_BYTE1;
+                    else 
+                      uart_state <= START_BYTE;
                     end if;
                 when INTR_PROC =>
                     if send_intr_proc = '0' then
@@ -974,21 +972,6 @@ begin
                 start_byte_i        <= '0';
                 rd_rx_fifo_proc     <= '0';
         when RESPONSE =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when INTR_PROC =>
                 time_out_proc       <= '1';
 
                 fsm2uart_wr_data    <= (others => '0');
