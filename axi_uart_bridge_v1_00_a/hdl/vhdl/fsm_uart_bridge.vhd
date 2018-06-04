@@ -126,10 +126,6 @@ architecture Behavioral of fsm_uart_bridge is
     signal tx_fifo_wr_en_i  : std_logic;
     signal tx_fifo_full_n   : std_logic;
     signal tr_type_i        : std_logic_vector(7 downto 0);
-    signal rx_fifo_rd_data_i   : std_logic_vector ( 7 downto 0);
-    signal bus2ip_mst_cmdack_i : std_logic;
-    signal bus2ip_mst_cmplt_i  : std_logic;
-    signal bus2ip_mstrd_d_i    : std_logic_vector(31 downto 0);
     signal ip2bus_mstwr_req_o  : std_logic;
     signal ip2bus_mstrd_req_o  : std_logic;
 
@@ -142,10 +138,6 @@ architecture Behavioral of fsm_uart_bridge is
 ---------------------------- Architecture body --------------------------------
 begin
     send_rw_axi_proc    <= not start_byte_i;
-    bus2ip_mstrd_d_i    <= bus2ip_mstrd_d;
-    bus2ip_mst_cmplt_i  <= bus2ip_mst_cmplt;
-    bus2ip_mst_cmdack_i <= bus2ip_mst_cmdack;
-    rx_fifo_rd_data_i   <= rx_fifo_rd_data;
     ip2bus_mstwr_req    <= ip2bus_mstwr_req_o; --master_write;
     ip2bus_mstrd_req    <= ip2bus_mstrd_req_o; --master_read;
     tx_fifo_wr_data     <= fsm2uart_wr_data; 
@@ -159,7 +151,6 @@ begin
     rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
     rx_fifo_rd_en       <= rx_fifo_rd_en_i;
     ip2bus_mst_reset    <= time_out;
-    
     len_equally         <= '1' when len_count = axi_tr_len else '0';
 
     TIME_OUT_REG_PROCESS : process (aclk)
@@ -184,7 +175,7 @@ begin
       if aclk'event and aclk = '1' then
         if aresetn = '0' then 
         ip2bus_mstwr_req_o <= '0';
-        elsif ((master_write = '1') and (bus2ip_mst_cmdack_i = '0')) then
+        elsif ((master_write = '1') and (bus2ip_mst_cmdack = '0')) then
         ip2bus_mstwr_req_o <= '1';
         else
         ip2bus_mstwr_req_o <= '0';
@@ -197,73 +188,127 @@ begin
       if aclk'event and aclk = '1' then
         if aresetn = '0' then 
         ip2bus_mstrd_req_o <= '0';
-        elsif ((master_read = '1') and (bus2ip_mst_cmdack_i = '0')) then
+        elsif ((master_read = '1') and (bus2ip_mst_cmdack = '0')) then
         ip2bus_mstrd_req_o <= '1';
         else
         ip2bus_mstrd_req_o <= '0';
         end if;
       end if;
     end process MSTRD_REQ_PROC;
+    
+    ------------------------------------------------------------------------------------
+--    axi address read from uart 
+------------------------------------------------------------------------------------
+    ADDR_REG_PROCESS : process(aclk, aresetn)
+    begin
+        if aclk'event and aclk = '1' then
+            if aresetn = '0' then
+            axi_addr    <=(others => '0');
+            addr_byte2    <=(others => '0');
+            addr_byte3    <=(others => '0');
+            addr_byte4    <=(others => '0');
+            elsif (((rx_fifo_rd_en_i = '1') and (w_addr_phase = '1')) and (last_addr_byte ='0')) then
+            addr_byte2    <= rx_fifo_rd_data;
+            addr_byte3    <= addr_byte2;
+            addr_byte4    <= addr_byte3;
+            elsif ((rx_fifo_rd_en_i = '1') and (last_addr_byte ='1')) then
+            axi_addr(31 downto 0) <= (rx_fifo_rd_data & addr_byte2 & addr_byte3 & addr_byte4);
+            else 
+            axi_addr(31 downto 0) <= axi_addr(31 downto 0);
+            end if;
+        end if;
+    end process ADDR_REG_PROCESS;
+
+-----------------------------------------------------------------------------------
+--    axi data read from uart
+-----------------------------------------------------------------------------------    
+    DATA_REG_PROCESS : process(aclk, aresetn)
+    begin
+        if aclk'event and aclk = '1' then
+            if aresetn = '0' then
+            axi_wr_data    <=(others => '0'); 
+            wr_data_byte2    <=(others => '0');
+            wr_data_byte3    <=(others => '0');
+            wr_data_byte4    <=(others => '0');
+            elsif (((rx_fifo_rd_en_i = '1') and (w_data_phase = '1')) and (last_w_data_byte ='0')) then
+            wr_data_byte2    <= rx_fifo_rd_data;
+            wr_data_byte3    <= wr_data_byte2;
+            wr_data_byte4    <= wr_data_byte3;
+            elsif ((rx_fifo_rd_en_i = '1') and (last_w_data_byte ='1')) then 
+            axi_wr_data(31 downto 0) <= (rx_fifo_rd_data & wr_data_byte2 & wr_data_byte3 & wr_data_byte4);
+            else 
+            axi_wr_data(31 downto 0) <=axi_wr_data(31 downto 0);
+            end if;
+        end if;
+    end process DATA_REG_PROCESS;
+
+----------------------------------------------------------------------------------
+--    read data from axi
+----------------------------------------------------------------------------------
+    RES_RD_DATA_PROCESS : process (aclk, aresetn)
+    begin
+        if aclk'event and aclk = '1' then
+            if aresetn = '0' then 
+            axi_rd_data <= (others => '0');
+            elsif (bus2ip_mst_cmplt = '1') then
+            axi_rd_data <= bus2ip_mstrd_d;
+            else
+            axi_rd_data <= axi_rd_data;
+            end if;
+        end if;
+    end process RES_RD_DATA_PROCESS;
 
     READ_START_BYTE_PROC : process (aclk, aresetn)
     begin
         if aclk'event and aclk = '1' then
             if aresetn = '0' then
-            trx_req_ws       <= '0';
-            trx_req_wb_f     <= '0';
-            trx_req_wb_i     <= '0';
-            trx_req_rs       <= '0';
-            trx_req_rb_f     <= '0';
-            trx_req_rb_i     <= '0';
-            
+            tr_type_i <= (others => '0');
             elsif (start_byte_i = '1') and (rx_fifo_rd_en_i = '1') then
-                tr_type_i <= rx_fifo_rd_data_i;
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"000") then   -- single read
-                    trx_req_rs <= '1';
-                    else 
-                    trx_req_rs <= '0';
-                end if;
-    
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"001") then   -- packet reading with address incrementing
-                    trx_req_rb_i <= '1';
-                    else 
-                    trx_req_rb_i <= '0';
-                end if;
-    
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"010") then   -- batch read with fixed
-                    trx_req_rb_f <= '1';
-                    else 
-                    trx_req_rb_f <= '0';
-                end if;
-    
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"100") then   -- single write
-                    trx_req_ws <= '1';
-                    else 
-                    trx_req_ws <= '0';
-                end if;
-    
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"101") then   -- packet writing with address incrementing
-                    trx_req_wb_i <= '1';
-                    else 
-                    trx_req_wb_i <= '0';
-                end if;
-    
-                if (rx_fifo_rd_data_i = trx_type & '0' & B"110") then   -- batch write with fixed
-                    trx_req_wb_f <= '1';
-                    else 
-                    trx_req_wb_f <= '0';
-                end if;
+                tr_type_i <= rx_fifo_rd_data;
             end if;
-        end if; 
+        end if;
     end process READ_START_BYTE_PROC;
+    
+    TRX_INIT_PROC : process (tr_type_i)
+    begin
+      trx_req_ws       <= '0';
+      trx_req_wb_f     <= '0';
+      trx_req_wb_i     <= '0';
+      trx_req_rs       <= '0';
+      trx_req_rb_f     <= '0';
+      trx_req_rb_i     <= '0';
+        case tr_type_i is
+          when (trx_type & '0' & B"000")
+                => trx_req_rs <= '1';               -- single read
+          when (trx_type & '0' & B"001")
+                => trx_req_rb_i <= '1';             -- packet reading with address incrementing
+          when (trx_type & '0' & B"010") 
+                => trx_req_rb_f <= '1';             -- batch read with fixed
+          when (trx_type & '0' & B"100")
+                => trx_req_ws <= '1';               -- single write
+          when (trx_type & '0' & B"101")
+                => trx_req_wb_i <= '1';             -- packet writing with address incrementing
+          when (trx_type & '0' & B"110")
+                => trx_req_wb_f <= '1';             -- batch write with fixed
+          when others =>
+                trx_req_ws       <= '0';
+                trx_req_wb_f     <= '0';
+                trx_req_wb_i     <= '0';
+                trx_req_rs       <= '0';
+                trx_req_rb_f     <= '0';
+                trx_req_rb_i     <= '0';
+        end case;
+    end process TRX_INIT_PROC;
+    
     
     trx_burst_mode  <= trx_req_rb_f or trx_req_rb_i or trx_req_wb_i or trx_req_wb_f;
     wr_trx_b_mode   <= trx_req_wb_f or trx_req_wb_i;
     rd_trx_b_mode   <= trx_req_rb_f or trx_req_rb_i;
 
 -------------------------------------------------------------------------------    
---                           UART_STATE_PROCESS                              --
+--                           UART FSM                              --
 -------------------------------------------------------------------------------    
+    
     UART_STATE_PROCESS  : process (aclk, aresetn, time_out)
     begin 
         if aresetn = '0' then
@@ -399,7 +444,7 @@ begin
                 when MST_WR =>
                     if time_out = '1' then
                     uart_state <= START_BYTE;
-                    elsif bus2ip_mst_cmdack_i = '1' then
+                    elsif bus2ip_mst_cmdack = '1' then
                     uart_state <= RESPONSE;
                     else
                     uart_state <= MST_WR;
@@ -407,13 +452,13 @@ begin
                 when MST_RD =>
                     if time_out = '1' then
                     uart_state <= START_BYTE;
-                    elsif bus2ip_mst_cmdack_i = '1' then
+                    elsif bus2ip_mst_cmdack = '1' then
                     uart_state <= RESPONSE;
                     else
                     uart_state <= MST_RD;
                     end if;
                 when RESPONSE =>
-                    if (bus2ip_mst_cmplt_i = '1') then
+                    if (bus2ip_mst_cmplt = '1') then
                       if time_out = '1' then
                         uart_state <= START_BYTE;
                         elsif trx_req_wb_i = '1' then
@@ -595,77 +640,17 @@ begin
             len_byte3     <=(others => '0');
             len_byte4     <=(others => '0');
             elsif (((rx_fifo_rd_en_i = '1') and (w_len_phase = '1')) and (last_len_byte ='0')) then
-            len_byte2    <= rx_fifo_rd_data_i;
+            len_byte2    <= rx_fifo_rd_data;
             len_byte3    <= len_byte2;
             len_byte4    <= len_byte3;
             elsif ((rx_fifo_rd_en_i = '1') and (last_len_byte ='1')) then
-            axi_tr_len(31 downto 0) <= (rx_fifo_rd_data_i & len_byte2 & len_byte3 & len_byte4);
+            axi_tr_len(31 downto 0) <= (rx_fifo_rd_data & len_byte2 & len_byte3 & len_byte4);
             else 
             axi_tr_len(31 downto 0) <= axi_tr_len(31 downto 0);
             end if;
         end if;
     end process LEN_REG_PROCESS;
-------------------------------------------------------------------------------------
---    axi address read from uart 
-------------------------------------------------------------------------------------
-    ADDR_REG_PROCESS : process(aclk, aresetn)
-    begin
-        if aclk'event and aclk = '1' then
-            if aresetn = '0' then
-            axi_addr    <=(others => '0');
-            addr_byte2    <=(others => '0');
-            addr_byte3    <=(others => '0');
-            addr_byte4    <=(others => '0');
-            elsif (((rx_fifo_rd_en_i = '1') and (w_addr_phase = '1')) and (last_addr_byte ='0')) then
-            addr_byte2    <= rx_fifo_rd_data_i;
-            addr_byte3    <= addr_byte2;
-            addr_byte4    <= addr_byte3;
-            elsif ((rx_fifo_rd_en_i = '1') and (last_addr_byte ='1')) then
-            axi_addr(31 downto 0) <= (rx_fifo_rd_data_i & addr_byte2 & addr_byte3 & addr_byte4);
-            else 
-            axi_addr(31 downto 0) <= axi_addr(31 downto 0);
-            end if;
-        end if;
-    end process ADDR_REG_PROCESS;
 
------------------------------------------------------------------------------------
---    axi data read from uart
------------------------------------------------------------------------------------    
-    DATA_REG_PROCESS : process(aclk, aresetn)
-    begin
-        if aclk'event and aclk = '1' then
-            if aresetn = '0' then
-            axi_wr_data    <=(others => '0'); 
-            wr_data_byte2    <=(others => '0');
-            wr_data_byte3    <=(others => '0');
-            wr_data_byte4    <=(others => '0');
-            elsif (((rx_fifo_rd_en_i = '1') and (w_data_phase = '1')) and (last_w_data_byte ='0')) then
-            wr_data_byte2    <= rx_fifo_rd_data_i;
-            wr_data_byte3    <= wr_data_byte2;
-            wr_data_byte4    <= wr_data_byte3;
-            elsif ((rx_fifo_rd_en_i = '1') and (last_w_data_byte ='1')) then 
-            axi_wr_data(31 downto 0) <= (rx_fifo_rd_data_i & wr_data_byte2 & wr_data_byte3 & wr_data_byte4);
-            else 
-            axi_wr_data(31 downto 0) <=axi_wr_data(31 downto 0);
-            end if;
-        end if;
-    end process DATA_REG_PROCESS;
-
-----------------------------------------------------------------------------------
---    read data from axi
-----------------------------------------------------------------------------------
-    RES_RD_DATA_PROCESS : process (aclk, aresetn)
-    begin
-        if aclk'event and aclk = '1' then
-            if aresetn = '0' then 
-            axi_rd_data <= (others => '0');
-            elsif (bus2ip_mst_cmplt_i = '1') then
-            axi_rd_data <= bus2ip_mstrd_d_i;
-            else
-            axi_rd_data <= axi_rd_data;
-            end if;
-        end if;
-    end process RES_RD_DATA_PROCESS;
 
 ---------------------------------------------------------------------------------
 --    state handler
