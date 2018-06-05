@@ -57,6 +57,7 @@ port (
     bus2ip_mstwr_dst_rdy_n  : in  std_logic;
 
     send_rw_axi_proc        : out std_logic;
+    ip2bus_mst_be           : out std_logic_vector(3 downto 0);
     send_intr_proc          : in  std_logic
 	   );
 end entity fsm_uart_bridge;
@@ -64,6 +65,13 @@ end entity fsm_uart_bridge;
 
 ----------------------- Architecture declaration ------------------------------
 architecture Behavioral of fsm_uart_bridge is
+    constant TRX_SR         : std_logic_vector(3 downto 0) := ('0' & B"000");
+    constant TRX_PRI        : std_logic_vector(3 downto 0) := ('0' & B"001");
+    constant TRX_PRF        : std_logic_vector(3 downto 0) := ('0' & B"010");
+    constant TRX_SW         : std_logic_vector(3 downto 0) := ('0' & B"100");
+    constant TRX_PWI        : std_logic_vector(3 downto 0) := ('0' & B"101");
+    constant TRX_PWF        : std_logic_vector(3 downto 0) := ('0' & B"110");
+    
     constant max_count      : integer := 2*(C_S_AXI_CLK_FREQ_HZ*(C_WLS+C_STB+1))/C_UART_BAUD_RATE;
     constant max_count_x    : std_logic_vector(15 downto 0):= CONV_STD_LOGIC_VECTOR(max_count,16); 
 
@@ -73,6 +81,7 @@ architecture Behavioral of fsm_uart_bridge is
                                 U_SEND_RD_DATA_BYTE3, U_SEND_RD_DATA_BYTE4, RESPONSE, INTR_PROC, U_SEND_TR_TYPE, U_SEND_ADDR_BYTE1,
                                 U_SEND_ADDR_BYTE2, U_SEND_ADDR_BYTE3,U_SEND_ADDR_BYTE4, U_SEND_LEN_BYTE1, U_SEND_LEN_BYTE2, U_SEND_LEN_BYTE3, U_SEND_LEN_BYTE4);
     signal uart_state      : UART_STATE_TYPE;
+    signal uart_next_state : UART_STATE_TYPE;
 
     signal time_st_out     : std_logic;
     signal time_out        : std_logic;
@@ -80,7 +89,6 @@ architecture Behavioral of fsm_uart_bridge is
     signal w_addr_phase    : std_logic;
     signal w_data_phase    : std_logic;
     signal w_len_phase     : std_logic;
-    signal trx_type        : std_logic_vector(3 downto 0):= B"1010";
     signal intr_type       : std_logic_vector(3 downto 0):= B"1011";
     signal start_byte_i    : std_logic;
     signal rx_fifo_rd_en_i : std_logic:= '0';
@@ -117,8 +125,6 @@ architecture Behavioral of fsm_uart_bridge is
     signal wr_data_byte4    : std_logic_vector(7 downto 0);
     signal last_w_data_byte : std_logic;
 
-    signal u_wr_addr        : std_logic_vector(31 downto 0);
-    signal u_wr_data        : std_logic_vector(31 downto 0);
 
     signal master_read      : std_logic;
     signal master_write     : std_logic;
@@ -126,17 +132,22 @@ architecture Behavioral of fsm_uart_bridge is
     signal tx_fifo_wr_en_i  : std_logic;
     signal tx_fifo_full_n   : std_logic;
     signal tr_type_i        : std_logic_vector(7 downto 0);
+    signal trx_type_ii      : std_logic_vector(3 downto 0);
     signal ip2bus_mstwr_req_o  : std_logic;
     signal ip2bus_mstrd_req_o  : std_logic;
+    signal strob_num           : std_logic_vector(1 downto 0);
 
     signal len_equally      : std_logic;
     signal len_count        : std_logic_vector(31 downto 0);
     signal time_out_proc    : std_logic;
-    signal axi_addr_incr    : std_logic_vector(31 downto 0);
+    signal axi_addr_incr    : std_logic_vector(31 downto 0):= x"0000_0000";
     signal time_out_counter : std_logic_vector(15 downto 0);
+    signal ip2bus_mst_be_o  : std_logic_vector(3 downto 0);
+    
 
 ---------------------------- Architecture body --------------------------------
 begin
+
     send_rw_axi_proc    <= not start_byte_i;
     ip2bus_mstwr_req    <= ip2bus_mstwr_req_o; --master_write;
     ip2bus_mstrd_req    <= ip2bus_mstrd_req_o; --master_read;
@@ -144,21 +155,47 @@ begin
     tx_fifo_full_n      <= not tx_fifo_full;
     tx_fifo_wr_en_i     <= '1' when ((tx_fifo_full_n = '1') and (wr_tx_fifo_proc = '1')) else '0';
     tx_fifo_wr_en       <= tx_fifo_wr_en_i;
-    ip2bus_mst_addr     <= axi_addr_incr when trx_burst_mode = '1' else axi_addr;
+    ip2bus_mst_addr     <= axi_addr_incr when ((trx_req_rb_i = '1') or (trx_req_wb_i = '1')) else axi_addr;
     ip2bus_mstwr_d      <= axi_wr_data;
-    u_wr_addr           <= axi_addr;
-    u_wr_data           <= axi_rd_data;
     rx_fifo_rd_en_i     <= '1' when ((rx_fifo_empty = '0') and (rd_rx_fifo_proc = '1')) else '0';
     rx_fifo_rd_en       <= rx_fifo_rd_en_i;
     ip2bus_mst_reset    <= time_out;
     len_equally         <= '1' when len_count = axi_tr_len else '0';
-
+    ip2bus_mst_be       <= ip2bus_mst_be_o when ((len_count = (axi_tr_len - 1)) and (trx_burst_mode = '1')) else 
+                           ip2bus_mst_be_o when ((trx_req_ws = '1') or (trx_req_rs = '1')) else B"1111";
+    
+    LEN_COUNT_PROC : process(aclk, aresetn)
+    begin
+      if rising_edge(aclk) then
+        if aresetn = '0' or start_byte_i = '1' then
+        len_count <= (others => '0');
+        elsif (bus2ip_mst_cmplt = '1') then
+        len_count <= len_count + 1;
+        else
+        len_count <= len_count;
+        end if;
+      end if;
+    end process LEN_COUNT_PROC;
+    
+    INCR_ADDR_GEN : process(aclk, aresetn)
+    begin
+      if rising_edge(aclk) then
+        if w_len_phase = '1' then
+        axi_addr_incr <= axi_addr;
+        elsif bus2ip_mst_cmplt = '1' then
+        axi_addr_incr <= axi_addr_incr + x"0000_0004";
+        else
+        axi_addr_incr <= axi_addr_incr;
+        end if;
+      end if;
+    end process INCR_ADDR_GEN;
+    
     TIME_OUT_REG_PROCESS : process (aclk)
     begin
       if ((aresetn = '0' or time_out_proc = '0') or (rx_fifo_rd_en_i = '1' or tx_fifo_wr_en_i = '1'))then
       time_out_counter <= max_count_x;
       time_st_out <= '0';
-      elsif aclk'event and aclk = '1' then
+      elsif rising_edge(aclk) then
         if time_out_counter = "000000000000001" then
         time_st_out <= '1';
         else
@@ -172,7 +209,7 @@ begin
     
     MSTWR_REQ_PROC : process(aclk, aresetn)
     begin
-      if aclk'event and aclk = '1' then
+      if rising_edge(aclk) then
         if aresetn = '0' then 
         ip2bus_mstwr_req_o <= '0';
         elsif ((master_write = '1') and (bus2ip_mst_cmdack = '0')) then
@@ -185,7 +222,7 @@ begin
 
     MSTRD_REQ_PROC : process(aclk, aresetn)
     begin
-      if aclk'event and aclk = '1' then
+      if rising_edge(aclk) then
         if aresetn = '0' then 
         ip2bus_mstrd_req_o <= '0';
         elsif ((master_read = '1') and (bus2ip_mst_cmdack = '0')) then
@@ -201,7 +238,7 @@ begin
 ------------------------------------------------------------------------------------
     ADDR_REG_PROCESS : process(aclk, aresetn)
     begin
-        if aclk'event and aclk = '1' then
+        if rising_edge(aclk) then
             if aresetn = '0' then
             axi_addr    <=(others => '0');
             addr_byte2    <=(others => '0');
@@ -224,7 +261,7 @@ begin
 -----------------------------------------------------------------------------------    
     DATA_REG_PROCESS : process(aclk, aresetn)
     begin
-        if aclk'event and aclk = '1' then
+        if rising_edge(aclk) then
             if aresetn = '0' then
             axi_wr_data    <=(others => '0'); 
             wr_data_byte2    <=(others => '0');
@@ -247,7 +284,7 @@ begin
 ----------------------------------------------------------------------------------
     RES_RD_DATA_PROCESS : process (aclk, aresetn)
     begin
-        if aclk'event and aclk = '1' then
+        if rising_edge(aclk) then
             if aresetn = '0' then 
             axi_rd_data <= (others => '0');
             elsif (bus2ip_mst_cmplt = '1') then
@@ -258,387 +295,17 @@ begin
         end if;
     end process RES_RD_DATA_PROCESS;
 
-    READ_START_BYTE_PROC : process (aclk, aresetn)
-    begin
-        if aclk'event and aclk = '1' then
-            if aresetn = '0' then
-            tr_type_i <= (others => '0');
-            elsif (start_byte_i = '1') and (rx_fifo_rd_en_i = '1') then
-                tr_type_i <= rx_fifo_rd_data;
-            end if;
-        end if;
-    end process READ_START_BYTE_PROC;
-    
-    TRX_INIT_PROC : process (tr_type_i)
-    begin
-      trx_req_ws       <= '0';
-      trx_req_wb_f     <= '0';
-      trx_req_wb_i     <= '0';
-      trx_req_rs       <= '0';
-      trx_req_rb_f     <= '0';
-      trx_req_rb_i     <= '0';
-        case tr_type_i is
-          when (trx_type & '0' & B"000")
-                => trx_req_rs <= '1';               -- single read
-          when (trx_type & '0' & B"001")
-                => trx_req_rb_i <= '1';             -- packet reading with address incrementing
-          when (trx_type & '0' & B"010") 
-                => trx_req_rb_f <= '1';             -- batch read with fixed
-          when (trx_type & '0' & B"100")
-                => trx_req_ws <= '1';               -- single write
-          when (trx_type & '0' & B"101")
-                => trx_req_wb_i <= '1';             -- packet writing with address incrementing
-          when (trx_type & '0' & B"110")
-                => trx_req_wb_f <= '1';             -- batch write with fixed
-          when others =>
-                trx_req_ws       <= '0';
-                trx_req_wb_f     <= '0';
-                trx_req_wb_i     <= '0';
-                trx_req_rs       <= '0';
-                trx_req_rb_f     <= '0';
-                trx_req_rb_i     <= '0';
-        end case;
-    end process TRX_INIT_PROC;
-    
-    
-    trx_burst_mode  <= trx_req_rb_f or trx_req_rb_i or trx_req_wb_i or trx_req_wb_f;
-    wr_trx_b_mode   <= trx_req_wb_f or trx_req_wb_i;
-    rd_trx_b_mode   <= trx_req_rb_f or trx_req_rb_i;
-
--------------------------------------------------------------------------------    
---                           UART FSM                              --
--------------------------------------------------------------------------------    
-    
-    UART_STATE_PROCESS  : process (aclk, aresetn, time_out)
-    begin 
-        if aresetn = '0' then
-            uart_state  <= START_BYTE;
-            elsif (aclk'event and aclk = '1') then
-                case uart_state is
-                when START_BYTE => 
-                    len_count <= (others => '0');
-                    if send_intr_proc = '1' then 
-                      uart_state <= INTR_PROC; 
-                    elsif (rx_fifo_rd_en_i = '1') then
-                      uart_state <= U_ADDR_BYTE1;
-                    else 
-                      uart_state <= START_BYTE;
-                    end if;
-                when INTR_PROC =>
-                    if send_intr_proc = '0' then
-                      uart_state <= START_BYTE;
-                    else
-                      uart_state <= INTR_PROC;
-                    end if;
-                when U_ADDR_BYTE1 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_ADDR_BYTE2;
-                    else
-                    uart_state <= U_ADDR_BYTE1;
-                    end if;
-                when U_ADDR_BYTE2 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif rx_fifo_rd_en_i = '1' then
-                    uart_state <= U_ADDR_BYTE3;
-                    else
-                    uart_state <= U_ADDR_BYTE2;
-                    end if;
-                when U_ADDR_BYTE3 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif rx_fifo_rd_en_i = '1' then
-                    uart_state <= U_ADDR_BYTE4;
-                    else
-                    uart_state <= U_ADDR_BYTE3;
-                    end if;
-                when U_ADDR_BYTE4 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                      elsif rx_fifo_rd_en_i = '1' then 
-                      if trx_req_rs = '1' then
-                      uart_state <= MST_RD;
-                      elsif trx_req_ws = '1' then
-                      uart_state <= U_WR_DATA_BYTE1;
-                      elsif trx_burst_mode = '1' then 
-                      uart_state <= U_LEN_BYTE1;
-                      else
-                      uart_state <= START_BYTE;
-                      end if;
-                    else
-                    uart_state <= U_ADDR_BYTE4;
-                    end if;
-                when U_LEN_BYTE1 =>
-                    axi_addr_incr <= axi_addr;
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_LEN_BYTE2;
-                    else
-                    uart_state <= U_LEN_BYTE1;
-                    end if;
-                when U_LEN_BYTE2 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_LEN_BYTE3;
-                    else
-                    uart_state <= U_LEN_BYTE2;
-                    end if;
-                when U_LEN_BYTE3 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_LEN_BYTE4;
-                    else
-                    uart_state <= U_LEN_BYTE3;
-                    end if;
-                when U_LEN_BYTE4 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif rx_fifo_rd_en_i = '1' then
-                    if rd_trx_b_mode = '1' then 
-                    uart_state <= MST_RD;
-                    elsif (wr_trx_b_mode = '1') then 
-                    uart_state <= U_WR_DATA_BYTE1;
-                    else 
-                    uart_state <= START_BYTE;
-                    end if;
-                    else
-                    uart_state <= U_LEN_BYTE4;
-                    end if;
-                when U_WR_DATA_BYTE1 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_WR_DATA_BYTE2;
-                    else
-                    uart_state <= U_WR_DATA_BYTE1;
-                    end if;
-                when U_WR_DATA_BYTE2 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_WR_DATA_BYTE3;
-                    else
-                    uart_state <= U_WR_DATA_BYTE2;
-                    end if;
-                when U_WR_DATA_BYTE3 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= U_WR_DATA_BYTE4;
-                    else
-                    uart_state <= U_WR_DATA_BYTE3;
-                    end if;
-                when U_WR_DATA_BYTE4 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (rx_fifo_rd_en_i = '1') then
-                    uart_state <= MST_WR;
-                    else
-                    uart_state <= U_WR_DATA_BYTE4;
-                    end if;
-                when MST_WR =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif bus2ip_mst_cmdack = '1' then
-                    uart_state <= RESPONSE;
-                    else
-                    uart_state <= MST_WR;
-                    end if;
-                when MST_RD =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif bus2ip_mst_cmdack = '1' then
-                    uart_state <= RESPONSE;
-                    else
-                    uart_state <= MST_RD;
-                    end if;
-                when RESPONSE =>
-                    if (bus2ip_mst_cmplt = '1') then
-                      if time_out = '1' then
-                        uart_state <= START_BYTE;
-                        elsif trx_req_wb_i = '1' then
-                            if (len_count = axi_tr_len - 1) then
-                            len_count <= (len_count + 1);
-                            uart_state <= U_SEND_TR_TYPE;
-                            else
-                            len_count <= (len_count + 1);
-                            axi_addr_incr <= axi_addr_incr + x"0000_0004";
-                            uart_state <= U_WR_DATA_BYTE1;
-                            end if;
-                        elsif trx_req_wb_f = '1' then 
-                            if (len_count = axi_tr_len - 1) then
-                            len_count <= (len_count + 1);
-                            uart_state <= U_SEND_TR_TYPE;
-                            else
-                            len_count <= len_count + 1;
-                            axi_addr_incr <= axi_addr;
-                            uart_state <= U_WR_DATA_BYTE1;
-                            end if;
-                        elsif trx_req_rb_i = '1' then
-                            if len_count = x"0000_0000" then
-                            len_count <= len_count + 1;
-                            uart_state <= U_SEND_TR_TYPE;
-                            axi_addr_incr<= axi_addr_incr + x"0000_0004";
-                            else
-                            len_count <= len_count + 1;
-                            axi_addr_incr<= axi_addr_incr + x"0000_0004";
-                            uart_state <= U_SEND_RD_DATA_BYTE1;
-                            end if;
-                        elsif trx_req_rb_f = '1' then
-                            if len_count = x"0000_0000" then
-                            len_count <= len_count + 1;
-                            uart_state <= U_SEND_TR_TYPE;
-                            else
-                            len_count <= len_count + 1;
-                            axi_addr_incr <= axi_addr;
-                            uart_state <= U_SEND_RD_DATA_BYTE1;
-                            end if;
-                        elsif trx_burst_mode = '0' then
-                        uart_state <= U_SEND_TR_TYPE;
-                        else 
-                        uart_state <= START_BYTE;
-                        end if;
-                    else 
-                        uart_state <= RESPONSE;
-                    end if;
-                when U_SEND_TR_TYPE => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_ADDR_BYTE1;
-                    else
-                    uart_state <= U_SEND_TR_TYPE;
-                    end if;
-                when U_SEND_ADDR_BYTE1 => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_ADDR_BYTE2;
-                    else
-                    uart_state <= U_SEND_ADDR_BYTE1;
-                    end if;
-                when U_SEND_ADDR_BYTE2 => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_ADDR_BYTE3;
-                    else
-                    uart_state <= U_SEND_ADDR_BYTE2;
-                    end if;
-                when U_SEND_ADDR_BYTE3 => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_ADDR_BYTE4;
-                    else
-                    uart_state <= U_SEND_ADDR_BYTE3;
-                    end if;
-                when U_SEND_ADDR_BYTE4 => 
-                    if time_out = '1' then
-                      uart_state <= START_BYTE;
-                    elsif tx_fifo_wr_en_i = '1' then
-                      if rd_trx_b_mode = '1' then 
-                      uart_state <= U_SEND_LEN_BYTE1;
-                      elsif wr_trx_b_mode = '1' then 
-                      uart_state <= START_BYTE;
-                      elsif trx_req_rs = '1' then 
-                      uart_state <= U_SEND_RD_DATA_BYTE1;
-                      else
-                      uart_state <= START_BYTE;
-                      end if;
-                    else
-                    uart_state <= START_BYTE;
-                    end if;
-                when U_SEND_LEN_BYTE1 => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_LEN_BYTE2;
-                    else
-                    uart_state <= U_SEND_LEN_BYTE1;
-                    end if;
-                when U_SEND_LEN_BYTE2 => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_LEN_BYTE3;
-                    else
-                    uart_state <= U_SEND_LEN_BYTE2;
-                    end if;
-                when U_SEND_LEN_BYTE3 => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_LEN_BYTE4;
-                    else
-                    uart_state <= U_SEND_LEN_BYTE3;
-                    end if;
-                when U_SEND_LEN_BYTE4 => 
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_RD_DATA_BYTE1;
-                    else
-                    uart_state <= U_SEND_LEN_BYTE4;
-                    end if;
-                when U_SEND_RD_DATA_BYTE1 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_RD_DATA_BYTE2;
-                    else
-                    uart_state <= U_SEND_RD_DATA_BYTE1;
-                    end if;
-                when U_SEND_RD_DATA_BYTE2 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_RD_DATA_BYTE3;
-                    else
-                    uart_state <= U_SEND_RD_DATA_BYTE2;
-                    end if;
-                when U_SEND_RD_DATA_BYTE3 =>
-                    if time_out = '1' then
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                    uart_state <= U_SEND_RD_DATA_BYTE4;
-                    else
-                    uart_state <= U_SEND_RD_DATA_BYTE3;
-                    end if;
-                when U_SEND_RD_DATA_BYTE4 =>
-                    if time_out = '1' then 
-                    uart_state <= START_BYTE;
-                    elsif (tx_fifo_wr_en_i = '1') then
-                      if rd_trx_b_mode = '1' and len_equally = '0' then 
-                      uart_state <= MST_RD;
-                      else
-                      uart_state <= START_BYTE;
-                      end if;
-                    else
-                    uart_state <= U_SEND_RD_DATA_BYTE4;
-                    end if;
-                when others =>
-                    uart_state <= START_BYTE;
-                end case;
-        end if;
-    end process;
-    
 ------------------------------------------------------------------------------------
 --    length transaction in burst mode
 ------------------------------------------------------------------------------------
     LEN_REG_PROCESS : process(aclk, aresetn)
     begin
-        if aclk'event and aclk = '1' then
-            if aresetn = '0' then
-            axi_tr_len    <=(others => '0');
-            len_byte2     <=(others => '0');
-            len_byte3     <=(others => '0');
-            len_byte4     <=(others => '0');
+        if rising_edge(aclk) then
+            if ((aresetn = '0') or (start_byte_i = '1')) then
+            axi_tr_len    <= x"0000_0001";
+            len_byte2     <= (others => '0');
+            len_byte3     <= (others => '0');
+            len_byte4     <= (others => '0');
             elsif (((rx_fifo_rd_en_i = '1') and (w_len_phase = '1')) and (last_len_byte ='0')) then
             len_byte2    <= rx_fifo_rd_data;
             len_byte3    <= len_byte2;
@@ -656,471 +323,478 @@ begin
 --    state handler
 ---------------------------------------------------------------------------------
 
-    UART_PROCESS : process (uart_state) is
+    READ_START_BYTE_PROC : process (aclk, aresetn)
     begin
-    case uart_state is
-        when START_BYTE =>
-                time_out_proc       <= '0';
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '1';
-                rd_rx_fifo_proc     <= '1';
-        when INTR_PROC =>
-                time_out_proc       <= '0';
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '1';
-                rd_rx_fifo_proc     <= '0';
-        when U_ADDR_BYTE1 =>
-                time_out_proc       <= '1';
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_ADDR_BYTE2 => 
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_ADDR_BYTE3 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_ADDR_BYTE4 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '1';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_LEN_BYTE1 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_LEN_BYTE2 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_LEN_BYTE3 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_LEN_BYTE4 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '1';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_WR_DATA_BYTE1 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_WR_DATA_BYTE2 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_WR_DATA_BYTE3 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when U_WR_DATA_BYTE4 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '1';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '1';
-        when MST_WR =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '1';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when MST_RD =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '1';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_RD_DATA_BYTE1 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_rd_data(7 downto 0);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_RD_DATA_BYTE2 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_rd_data(15 downto 8);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_RD_DATA_BYTE3 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_rd_data(23 downto 16);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_RD_DATA_BYTE4 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_rd_data(31 downto 24);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '1';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when RESPONSE =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_TR_TYPE =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= tr_type_i;
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_ADDR_BYTE1 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_addr(7 downto 0);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_ADDR_BYTE2 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_addr(15 downto 8);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_ADDR_BYTE3 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_addr(23 downto 16);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_ADDR_BYTE4 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_addr(31 downto 24);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '1';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_LEN_BYTE1 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_tr_len(7 downto 0);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_LEN_BYTE2 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_tr_len(15 downto 8);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_LEN_BYTE3 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_tr_len(23 downto 16);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when U_SEND_LEN_BYTE4 =>
-                time_out_proc       <= '1';
-
-                fsm2uart_wr_data    <= axi_tr_len(31 downto 24);
-                wr_tx_fifo_proc     <= '1';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '1';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '0';
-                rd_rx_fifo_proc     <= '0';
-        when others =>
-                fsm2uart_wr_data    <= (others => '0');
-                wr_tx_fifo_proc     <= '0';
-                last_w_data_byte    <= '0';
-                last_addr_byte      <= '0';
-                last_len_byte       <= '0';
-                w_len_phase         <= '0';
-                w_addr_phase        <= '0';
-                w_data_phase        <= '0';
-                master_write        <= '0';
-                master_read         <= '0';
-                start_byte_i        <= '1';
-                rd_rx_fifo_proc     <= '1';
-                
+        if rising_edge(aclk) then
+            if aresetn = '0' then
+            tr_type_i <= B"00001000";
+            elsif (start_byte_i = '1') and (rx_fifo_rd_en_i = '1') then
+                tr_type_i <= rx_fifo_rd_data;
+            end if;
+        end if;
+    end process READ_START_BYTE_PROC;
+    
+    trx_type_ii <= tr_type_i(3 downto 0);
+    strob_num <= tr_type_i(5 downto 4);
+    
+    TRX_TYPE_INIT : process (trx_type_ii)
+    begin
+         trx_req_ws       <= '0';
+         trx_req_wb_f     <= '0';
+         trx_req_wb_i     <= '0';
+         trx_req_rs       <= '0';
+         trx_req_rb_f     <= '0';
+         trx_req_rb_i     <= '0';
+    case trx_type_ii is
+      when TRX_SR =>
+             trx_req_rs <= '1';               -- single read
+      when TRX_PRI =>
+             trx_req_rb_i <= '1';             -- packet reading with address incrementing
+      when TRX_PRF =>
+             trx_req_rb_f <= '1';             -- batch read with fixed
+      when TRX_SW =>
+             trx_req_ws <= '1';               -- single write
+      when TRX_PWI =>
+             trx_req_wb_i <= '1';             -- packet writing with address incrementing
+      when TRX_PWF =>
+             trx_req_wb_f <= '1';             -- batch write with fixed
+      when others =>
+             trx_req_ws       <= '0';
+             trx_req_wb_f     <= '0';
+             trx_req_wb_i     <= '0';
+             trx_req_rs       <= '0';
+             trx_req_rb_f     <= '0';
+             trx_req_rb_i     <= '0';
     end case;
-    end process UART_PROCESS;
+    end process TRX_TYPE_INIT;
+
+    IP2BUS_BE_INIT : process(strob_num)
+    begin
+    case strob_num is
+      when B"11" => ip2bus_mst_be_o <= B"1111";
+      when B"10" => ip2bus_mst_be_o <= B"0111";
+      when B"01" => ip2bus_mst_be_o <= B"0011";
+      when B"00" => ip2bus_mst_be_o <= B"0001";
+      when others => ip2bus_mst_be_o <= B"1111";
+    end case;
+    end process IP2BUS_BE_INIT;
+    
+    
+    trx_burst_mode  <= trx_req_rb_f or trx_req_rb_i or trx_req_wb_i or trx_req_wb_f;
+    wr_trx_b_mode   <= trx_req_wb_f or trx_req_wb_i;
+    rd_trx_b_mode   <= trx_req_rb_f or trx_req_rb_i;
+
+-------------------------------------------------------------------------------    
+--                           UART FSM                              --
+-------------------------------------------------------------------------------    
+    
+   FSM_SYNC_PROC: process (aclk)
+   begin
+      if rising_edge(aclk) then
+         if (aresetn = '0') then
+            uart_state <= START_BYTE;
+         else
+            uart_state <= uart_next_state;
+         end if;        
+      end if;
+   end process;
+    
+   FSM_OUTPUT_DECODE: process (uart_state, axi_rd_data, tr_type_i, axi_addr, axi_tr_len)
+   begin
+       time_out_proc       <= '0';
+       fsm2uart_wr_data    <= (others => '0');
+       wr_tx_fifo_proc     <= '0';
+       last_w_data_byte    <= '0';
+       last_addr_byte      <= '0';
+       last_len_byte       <= '0';
+       w_len_phase         <= '0';
+       w_addr_phase        <= '0';
+       w_data_phase        <= '0';
+       master_write        <= '0';
+       master_read         <= '0';
+       start_byte_i        <= '0';
+       rd_rx_fifo_proc     <= '0';
+    case (uart_state) is
+      when START_BYTE =>
+         start_byte_i        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when INTR_PROC =>
+         start_byte_i        <= '1';
+      when U_ADDR_BYTE1 =>
+         time_out_proc       <= '1';
+         w_addr_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_ADDR_BYTE2 =>
+         time_out_proc       <= '1';
+         w_addr_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_ADDR_BYTE3 =>
+         time_out_proc       <= '1';
+         w_addr_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_ADDR_BYTE4 =>
+         time_out_proc       <= '1';
+         last_addr_byte      <= '1';
+         w_addr_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_LEN_BYTE1 =>
+         time_out_proc       <= '1';
+         w_len_phase         <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_LEN_BYTE2 =>
+         time_out_proc       <= '1';
+         w_len_phase         <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_LEN_BYTE3 =>
+         time_out_proc       <= '1';
+         w_len_phase         <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_LEN_BYTE4 =>
+         time_out_proc       <= '1';
+         last_len_byte       <= '1';
+         w_len_phase         <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_WR_DATA_BYTE1 =>
+         time_out_proc       <= '1';
+         w_data_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_WR_DATA_BYTE2 =>
+         time_out_proc       <= '1';
+         w_data_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_WR_DATA_BYTE3 =>
+         time_out_proc       <= '1';
+         w_data_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when U_WR_DATA_BYTE4 =>
+         time_out_proc       <= '1';
+         last_w_data_byte    <= '1';
+         w_data_phase        <= '1';
+         rd_rx_fifo_proc     <= '1';
+      when MST_WR =>
+         time_out_proc       <= '1';
+         master_write        <= '1';
+      when MST_RD =>
+         time_out_proc       <= '1';
+         master_read         <= '1';
+      when U_SEND_RD_DATA_BYTE1 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_rd_data(7 downto 0);
+         wr_tx_fifo_proc     <= '1';
+         w_data_phase        <= '1';
+      when U_SEND_RD_DATA_BYTE2 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_rd_data(15 downto 8);
+         wr_tx_fifo_proc     <= '1';
+         w_data_phase        <= '1';
+      when U_SEND_RD_DATA_BYTE3 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_rd_data(23 downto 16);
+         wr_tx_fifo_proc     <= '1';
+         w_data_phase        <= '1';
+      when U_SEND_RD_DATA_BYTE4 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_rd_data(31 downto 24);
+         wr_tx_fifo_proc     <= '1';
+         w_data_phase        <= '1';
+      when RESPONSE =>
+         time_out_proc       <= '1';
+      when U_SEND_TR_TYPE =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= tr_type_i;
+         wr_tx_fifo_proc     <= '1';
+      when U_SEND_ADDR_BYTE1 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_addr(7 downto 0);
+         wr_tx_fifo_proc     <= '1';
+         w_addr_phase        <= '1';
+      when U_SEND_ADDR_BYTE2 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_addr(15 downto 8);
+         wr_tx_fifo_proc     <= '1';
+         w_addr_phase        <= '1';
+      when U_SEND_ADDR_BYTE3 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_addr(23 downto 16);
+         wr_tx_fifo_proc     <= '1';
+         w_addr_phase        <= '1';
+      when U_SEND_ADDR_BYTE4 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_addr(31 downto 24);
+         wr_tx_fifo_proc     <= '1';
+         w_addr_phase        <= '1';
+      when U_SEND_LEN_BYTE1 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_tr_len(7 downto 0);
+         wr_tx_fifo_proc     <= '1';
+      when U_SEND_LEN_BYTE2 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_tr_len(15 downto 8);
+         wr_tx_fifo_proc     <= '1';
+      when U_SEND_LEN_BYTE3 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_tr_len(23 downto 16);
+         wr_tx_fifo_proc     <= '1';
+      when U_SEND_LEN_BYTE4 =>
+         time_out_proc       <= '1';
+         fsm2uart_wr_data    <= axi_tr_len(31 downto 24);
+         wr_tx_fifo_proc     <= '1';
+      when others =>
+         fsm2uart_wr_data    <= (others => '0');
+         wr_tx_fifo_proc     <= '0';
+         last_w_data_byte    <= '0';
+         last_addr_byte      <= '0';
+         last_len_byte       <= '0';
+         w_len_phase         <= '0';
+         w_addr_phase        <= '0';
+         w_data_phase        <= '0';
+         master_write        <= '0';
+         master_read         <= '0';
+         start_byte_i        <= '0';
+         rd_rx_fifo_proc     <= '0';
+      end case;
+   end process;
+    
+  FSM_NEXT_STATE_DECODE  : process (uart_state, time_out, send_intr_proc, rx_fifo_rd_en_i, trx_req_rs, trx_req_ws, trx_burst_mode,
+                                    rd_trx_b_mode, wr_trx_b_mode, bus2ip_mst_cmdack, trx_req_wb_i, trx_req_wb_f, trx_req_rb_i, trx_req_rb_f,
+                                    len_count, len_equally, bus2ip_mst_cmplt, tx_fifo_wr_en_i, axi_tr_len)
+    begin 
+    uart_next_state <= uart_state;
+      case uart_state is
+      when START_BYTE => 
+          if send_intr_proc = '1' then 
+            uart_next_state <= INTR_PROC; 
+          elsif (rx_fifo_rd_en_i = '1') then
+            uart_next_state <= U_ADDR_BYTE1;
+          end if;
+      when INTR_PROC =>
+          if send_intr_proc = '0' then
+            uart_next_state <= START_BYTE;
+          end if;
+      when U_ADDR_BYTE1 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= U_ADDR_BYTE2;
+          end if;
+      when U_ADDR_BYTE2 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif rx_fifo_rd_en_i = '1' then
+          uart_next_state <= U_ADDR_BYTE3;
+          end if;
+      when U_ADDR_BYTE3 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif rx_fifo_rd_en_i = '1' then
+          uart_next_state <= U_ADDR_BYTE4;
+          end if;
+      when U_ADDR_BYTE4 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+            elsif rx_fifo_rd_en_i = '1' then 
+            if trx_req_rs = '1' then
+            uart_next_state <= MST_RD;
+            elsif trx_req_ws = '1' then
+            uart_next_state <= U_WR_DATA_BYTE1;
+            elsif trx_burst_mode = '1' then 
+            uart_next_state <= U_LEN_BYTE1;
+            else
+            uart_next_state <= START_BYTE;
+            end if;
+          end if;
+      when U_LEN_BYTE1 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= U_LEN_BYTE2;
+          end if;
+      when U_LEN_BYTE2 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= U_LEN_BYTE3;
+          end if;
+      when U_LEN_BYTE3 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= U_LEN_BYTE4;
+          end if;
+      when U_LEN_BYTE4 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif rx_fifo_rd_en_i = '1' then
+          if rd_trx_b_mode = '1' then 
+          uart_next_state <= MST_RD;
+          elsif (wr_trx_b_mode = '1') then 
+          uart_next_state <= U_WR_DATA_BYTE1;
+          else 
+          uart_next_state <= START_BYTE;
+          end if;
+          end if;
+      when U_WR_DATA_BYTE1 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= U_WR_DATA_BYTE2;
+          end if;
+      when U_WR_DATA_BYTE2 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= U_WR_DATA_BYTE3;
+          end if;
+      when U_WR_DATA_BYTE3 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= U_WR_DATA_BYTE4;
+          end if;
+      when U_WR_DATA_BYTE4 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (rx_fifo_rd_en_i = '1') then
+          uart_next_state <= MST_WR;
+          end if;
+      when MST_WR =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif bus2ip_mst_cmdack = '1' then
+          uart_next_state <= RESPONSE;
+          end if;
+      when MST_RD =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif bus2ip_mst_cmdack = '1' then
+          uart_next_state <= RESPONSE;
+          end if;
+      when RESPONSE =>
+          if (bus2ip_mst_cmplt = '1') then
+            if time_out = '1' then
+              uart_next_state <= START_BYTE;
+              elsif trx_req_wb_i = '1' then
+                  if (len_count = axi_tr_len - 1) then
+                  uart_next_state <= U_SEND_TR_TYPE;
+                  else
+                  uart_next_state <= U_WR_DATA_BYTE1;
+                  end if;
+              elsif trx_req_wb_f = '1' then 
+                  if (len_count = axi_tr_len - 1) then
+                  uart_next_state <= U_SEND_TR_TYPE;
+                  else
+                  uart_next_state <= U_WR_DATA_BYTE1;
+                  end if;
+              elsif trx_req_rb_i = '1' then
+                  if len_count = x"0000_0000" then
+                  uart_next_state <= U_SEND_TR_TYPE;
+                  else
+                  uart_next_state <= U_SEND_RD_DATA_BYTE1;
+                  end if;
+              elsif trx_req_rb_f = '1' then
+                  if len_count = x"0000_0000" then
+                  uart_next_state <= U_SEND_TR_TYPE;
+                  else
+                  uart_next_state <= U_SEND_RD_DATA_BYTE1;
+                  end if;
+              elsif trx_burst_mode = '0' then
+                  uart_next_state <= U_SEND_TR_TYPE;
+            end if;
+          end if;
+      when U_SEND_TR_TYPE => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_ADDR_BYTE1;
+          end if;
+      when U_SEND_ADDR_BYTE1 => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_ADDR_BYTE2;
+          end if;
+      when U_SEND_ADDR_BYTE2 => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_ADDR_BYTE3;
+          end if;
+      when U_SEND_ADDR_BYTE3 => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_ADDR_BYTE4;
+          end if;
+      when U_SEND_ADDR_BYTE4 => 
+          if time_out = '1' then
+            uart_next_state <= START_BYTE;
+          elsif tx_fifo_wr_en_i = '1' then
+            if rd_trx_b_mode = '1' then 
+            uart_next_state <= U_SEND_LEN_BYTE1;
+            elsif wr_trx_b_mode = '1' then 
+            uart_next_state <= START_BYTE;
+            elsif trx_req_rs = '1' then 
+            uart_next_state <= U_SEND_RD_DATA_BYTE1;
+            else
+            uart_next_state <= START_BYTE;
+            end if;
+          end if;
+      when U_SEND_LEN_BYTE1 => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_LEN_BYTE2;
+          end if;
+      when U_SEND_LEN_BYTE2 => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_LEN_BYTE3;
+          end if;
+      when U_SEND_LEN_BYTE3 => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_LEN_BYTE4;
+          end if;
+      when U_SEND_LEN_BYTE4 => 
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_RD_DATA_BYTE1;
+          end if;
+      when U_SEND_RD_DATA_BYTE1 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_RD_DATA_BYTE2;
+          end if;
+      when U_SEND_RD_DATA_BYTE2 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_RD_DATA_BYTE3;
+          end if;
+      when U_SEND_RD_DATA_BYTE3 =>
+          if time_out = '1' then
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+          uart_next_state <= U_SEND_RD_DATA_BYTE4;
+          end if;
+      when U_SEND_RD_DATA_BYTE4 =>
+          if time_out = '1' then 
+          uart_next_state <= START_BYTE;
+          elsif (tx_fifo_wr_en_i = '1') then
+            if rd_trx_b_mode = '1' and len_equally = '0' then 
+            uart_next_state <= MST_RD;
+            else
+            uart_next_state <= START_BYTE;
+            end if;
+          end if;
+      when others =>
+          uart_next_state <= START_BYTE;
+      end case;
+    end process;
+
 end Behavioral;
 -------------------------------------------------------------------------------

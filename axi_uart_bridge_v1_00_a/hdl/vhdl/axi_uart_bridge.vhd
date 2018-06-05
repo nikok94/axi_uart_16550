@@ -104,6 +104,7 @@ architecture Behavioral of axi_uart_bridge is
     signal md_error                : std_logic;-- Discrete Out
     signal send_intr_proc          : std_logic;
     signal send_rw_axi_proc        : std_logic;
+    signal ip2bus_mst_be           : std_logic_vector(3 downto 0);
 	 
 
 
@@ -213,6 +214,7 @@ FSM_inst : entity axi_uart_bridge_v1_00_a.fsm_uart_bridge
         ip2bus_mstwr_d          => ip2bus_mstwr_d,
         bus2ip_mstwr_dst_rdy_n  => bus2ip_mstwr_dst_rdy_n,
         send_rw_axi_proc        => send_rw_axi_proc,
+        ip2bus_mst_be           => ip2bus_mst_be,
         send_intr_proc          => send_intr_proc
     );
 
@@ -249,7 +251,7 @@ axi_master_inst : entity axi_uart_bridge_v1_00_a.axi_master_lite
         ip2bus_mstrd_req        => ip2bus_mstrd_req,
         ip2bus_mstwr_req        => ip2bus_mstwr_req,
         ip2bus_mst_addr         => ip2bus_mst_addr ,
-        ip2bus_mst_be           => "1111"          ,
+        ip2bus_mst_be           => ip2bus_mst_be,
         ip2bus_mst_lock         => '0'             ,
         ip2bus_mst_reset        => ip2bus_mst_reset,
 
